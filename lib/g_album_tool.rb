@@ -6,6 +6,8 @@ require "csv"
 require "rchardet"
 
 class GAlbumTool
+  SHOW_COMMAND = false
+
   IMAGE_EXTENSIONS = %w[jpg jpeg heic dng png gif bmp tiff].freeze
   VIDEO_EXTENSIONS = %w[mp4 mov avi mkv].freeze
   SUPPORTED_EXTENSIONS = IMAGE_EXTENSIONS + VIDEO_EXTENSIONS
@@ -27,7 +29,7 @@ class GAlbumTool
   def process
     return unless valid_paths?
 
-    log(:info, "Processing files in directory: #{origin_directory}")
+    log(:info, "Processing files in directory: #{origin_directory}", at_console: true)
 
     media_files = Dir.glob(File.join(origin_directory, "*.{#{SUPPORTED_EXTENSIONS.join(",")}}")).select { |f| File.file?(f) }
     json_files = Dir.glob(File.join(origin_directory, "*.json")).select { |f| File.file?(f) }
@@ -41,14 +43,10 @@ class GAlbumTool
       extension = File.extname(file).downcase.delete(".")
       data = read_json(file)
 
-      if SUPPORTED_EXTENSIONS.include?(extension)
-        update_metadata(file, data)
-      elsif verbose
-        log(:info, "Unsupported file type: #{file}")
-      end
+      SUPPORTED_EXTENSIONS.include?(extension) ? update_metadata(file, data) : log(:info, "Unsupported file type: #{file}")
     end
 
-    log(:info, "Processing completed.")
+    log(:info, "Processing completed.", at_console: true)
   end
 
   private
@@ -61,14 +59,14 @@ class GAlbumTool
     !dir_exist.compact.empty?
   end
 
-  def log(level, message)
+  def log(level, message, at_console: verbose)
     case level
     when :info
       logger.info(message)
-      puts message
+      puts message if at_console
     when :error
       logger.error(message)
-      puts "ERROR: #{message}"
+      puts "ERROR: #{message}" if at_console
     end
   end
 
@@ -79,22 +77,18 @@ class GAlbumTool
   end
 
   def execute_command(cmd)
-    log(:info, "Executing: #{cmd.join(" ")}") if verbose
+    log(:info, "Executing: #{cmd.join(" ")}") if SHOW_COMMAND
 
     stdout_str, stderr_str, status = Open3.capture3(*cmd)
 
-    if verbose
-      status.success? ? log(:info, "Success: #{clean_string(stdout_str)}") : log(:error, "Failed: #{clean_string(stderr_str)}")
-    end
+    status.success? ? log(:info, "Success: #{clean_string(stdout_str)} #{cmd[2]}") : log(:error, "Failed: #{clean_string(stderr_str)}")
   end
 
   def read_json(file_path)
     json_path = "#{file_path}.json"
 
     begin
-      data = JSON.parse(File.read(json_path), encoding: "UTF-8")
-      log(:info, "Loaded JSON for #{file_path}") if verbose
-      data
+      JSON.parse(File.read(json_path), encoding: "UTF-8")
     rescue JSON::ParserError => e
       log(:error, "Invalid JSON format in #{json_path}: #{e.message}")
       nil
@@ -107,14 +101,12 @@ class GAlbumTool
     missing_json = media_files - media_files_from_json
     missing_media = media_files_from_json - media_files
 
-    if verbose
-      missing_json.each do |file_path|
-        log(:info, "JSON data is missing for media file: #{file_path}")
-      end
+    missing_json.each do |file_path|
+      log(:info, "JSON data is missing for media file: #{file_path}")
+    end
 
-      missing_media.each do |file_path|
-        log(:info, "Media file is missing for JSON data: #{file_path}")
-      end
+    missing_media.each do |file_path|
+      log(:info, "Media file is missing for JSON data: #{file_path}")
     end
 
     media_files & media_files_from_json
