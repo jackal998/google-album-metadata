@@ -4,13 +4,10 @@ require "json"
 require "logger"
 require "fileutils"
 require "open3"
-require "pry"
 require "csv"
 require "rchardet"
 
-class GooglePhotosMetadataEditor
-  LOG_COMMAND = false
-
+class GAlbumTool
   IMAGE_EXTENSIONS = %w[jpg jpeg heic dng png gif bmp tiff].freeze
   VIDEO_EXTENSIONS = %w[mp4 mov avi mkv].freeze
   SUPPORTED_EXTENSIONS = IMAGE_EXTENSIONS + VIDEO_EXTENSIONS
@@ -19,9 +16,10 @@ class GooglePhotosMetadataEditor
   OFFSET_TIMES_KEYS = %w[OffsetTime OffsetTimeOriginal OffsetTimeDigitized]
   OFFSET_TIMES_PATH = "./local_data/offset_times.csv".freeze
 
-  attr_reader :logger, :origin_directory, :destination_directory, :offset_time
+  attr_reader :verbose, :logger, :origin_directory, :destination_directory, :offset_time
 
-  def initialize(origin_directory, destination_directory)
+  def initialize(verbose, origin_directory, destination_directory)
+    @verbose = verbose
     @origin_directory = origin_directory
     @destination_directory = destination_directory
     @logger = Logger.new(LOG_FILE)
@@ -29,6 +27,8 @@ class GooglePhotosMetadataEditor
   end
 
   def process
+    return unless valid_paths?
+
     log(:info, "Processing files in directory: #{origin_directory}")
 
     media_files = Dir.glob(File.join(origin_directory, "*.{#{SUPPORTED_EXTENSIONS.join(",")}}")).select { |f| File.file?(f) }
@@ -46,7 +46,7 @@ class GooglePhotosMetadataEditor
       if SUPPORTED_EXTENSIONS.include?(extension)
         update_metadata(file, data)
       else
-        log(:info, "Unsupported file type: #{file}")
+        log(:info, "Unsupported file type: #{file}") if verbose
       end
     end
     
@@ -54,6 +54,14 @@ class GooglePhotosMetadataEditor
   end
 
   private
+
+  def valid_paths?
+    dir_exist = [origin_directory, destination_directory].filter_map do |dir|
+      Dir.exist?(dir) || log(:error, "Directory does not exist: #{dir}")
+    end
+
+    !dir_exist.compact.empty?
+  end
   
   def log(level, message)
     case level
@@ -73,11 +81,13 @@ class GooglePhotosMetadataEditor
   end
 
   def execute_command(cmd)
-    log(:info, "Executing: #{cmd.join(" ")}") if LOG_COMMAND
+    log(:info, "Executing: #{cmd.join(" ")}") if verbose
     
     stdout_str, stderr_str, status = Open3.capture3(*cmd)
   
-    status.success? ? log(:info, "Success: #{clean_string(stdout_str)}") : log(:error, "Failed: #{clean_string(stderr_str)}")
+    if verbose
+      status.success? ? log(:info, "Success: #{clean_string(stdout_str)}") : log(:error, "Failed: #{clean_string(stderr_str)}")
+    end
   end
 
   def read_json(file_path)
@@ -85,7 +95,7 @@ class GooglePhotosMetadataEditor
   
     begin
       data = JSON.parse(File.read(json_path), encoding: 'UTF-8')
-      log(:info, "Loaded JSON for #{file_path}")
+      log(:info, "Loaded JSON for #{file_path}") if verbose
       return data
     rescue JSON::ParserError => e
       log(:error, "Invalid JSON format in #{json_path}: #{e.message}")
@@ -99,12 +109,14 @@ class GooglePhotosMetadataEditor
     missing_json = media_files - media_files_from_json
     missing_media = media_files_from_json - media_files
 
-    missing_json.each do |file_path|
-      log(:info, "JSON data is missing for media file: #{file_path}")
-    end
-  
-    missing_media.each do |file_path|
-      log(:info, "Media file is missing for JSON data: #{file_path}")
+    if verbose
+      missing_json.each do |file_path|
+        log(:info, "JSON data is missing for media file: #{file_path}")
+      end
+    
+      missing_media.each do |file_path|
+        log(:info, "Media file is missing for JSON data: #{file_path}")
+      end
     end
   
     media_files & media_files_from_json
@@ -149,27 +161,4 @@ class GooglePhotosMetadataEditor
     cmd = ["exiftool", "-o", File.join(destination_directory, File.basename(file_path)), *exif_args, file_path]
     execute_command(cmd)
   end
-end
-
-# Entry Point
-if __FILE__ == $0
-  origin_directory = ARGV[0]
-  destination_directory = ARGV[1]
-
-  unless origin_directory && destination_directory
-    puts "Usage: ruby metadata_editor.rb <origin_directory> <destination_directory>"
-    exit
-  end
-
-  unless Dir.exist?(origin_directory)
-    puts "Directory does not exist: #{origin_directory}"
-    exit
-  end
-
-  unless Dir.exist?(destination_directory)
-    puts "Directory does not exist: #{destination_directory}"
-    exit
-  end
-
-  GooglePhotosMetadataEditor.new(origin_directory, destination_directory).process
 end
