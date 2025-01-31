@@ -1,5 +1,3 @@
-#encoding: UTF-8
-
 require "json"
 require "logger"
 require "fileutils"
@@ -33,23 +31,23 @@ class GAlbumTool
 
     media_files = Dir.glob(File.join(origin_directory, "*.{#{SUPPORTED_EXTENSIONS.join(",")}}")).select { |f| File.file?(f) }
     json_files = Dir.glob(File.join(origin_directory, "*.json")).select { |f| File.file?(f) }
-  
+
     media_files = check_files(media_files, json_files)
     return log(:info, "No valid media found.") if media_files.empty?
 
     load_offset_times
-  
+
     media_files.each do |file|
       extension = File.extname(file).downcase.delete(".")
       data = read_json(file)
-  
+
       if SUPPORTED_EXTENSIONS.include?(extension)
         update_metadata(file, data)
-      else
-        log(:info, "Unsupported file type: #{file}") if verbose
+      elsif verbose
+        log(:info, "Unsupported file type: #{file}")
       end
     end
-    
+
     log(:info, "Processing completed.")
   end
 
@@ -62,7 +60,7 @@ class GAlbumTool
 
     !dir_exist.compact.empty?
   end
-  
+
   def log(level, message)
     case level
     when :info
@@ -82,9 +80,9 @@ class GAlbumTool
 
   def execute_command(cmd)
     log(:info, "Executing: #{cmd.join(" ")}") if verbose
-    
+
     stdout_str, stderr_str, status = Open3.capture3(*cmd)
-  
+
     if verbose
       status.success? ? log(:info, "Success: #{clean_string(stdout_str)}") : log(:error, "Failed: #{clean_string(stderr_str)}")
     end
@@ -92,20 +90,20 @@ class GAlbumTool
 
   def read_json(file_path)
     json_path = "#{file_path}.json"
-  
+
     begin
-      data = JSON.parse(File.read(json_path), encoding: 'UTF-8')
+      data = JSON.parse(File.read(json_path), encoding: "UTF-8")
       log(:info, "Loaded JSON for #{file_path}") if verbose
-      return data
+      data
     rescue JSON::ParserError => e
       log(:error, "Invalid JSON format in #{json_path}: #{e.message}")
-      return nil
+      nil
     end
   end
 
   def check_files(media_files, json_files)
     media_files_from_json = json_files.map { |f| f.match(/(.*)\.json/)[1] }
-  
+
     missing_json = media_files - media_files_from_json
     missing_media = media_files_from_json - media_files
 
@@ -113,12 +111,12 @@ class GAlbumTool
       missing_json.each do |file_path|
         log(:info, "JSON data is missing for media file: #{file_path}")
       end
-    
+
       missing_media.each do |file_path|
         log(:info, "Media file is missing for JSON data: #{file_path}")
       end
     end
-  
+
     media_files & media_files_from_json
   end
 
@@ -135,17 +133,17 @@ class GAlbumTool
   def update_metadata(file_path, data)
     exif_args = []
 
-    creation_time = Time.at(data.dig("creationTime", "timestamp").to_i, in: offset_time[file_path]).strftime('%Y:%m:%d %H:%M:%S')
+    creation_time = Time.at(data.dig("creationTime", "timestamp").to_i, in: offset_time[file_path]).strftime("%Y:%m:%d %H:%M:%S")
     exif_args << "-FileCreateDate='#{creation_time}'"
-  
-    taken_time = Time.at(data.dig("photoTakenTime", "timestamp").to_i, in: offset_time[file_path]).strftime('%Y:%m:%d %H:%M:%S')
+
+    taken_time = Time.at(data.dig("photoTakenTime", "timestamp").to_i, in: offset_time[file_path]).strftime("%Y:%m:%d %H:%M:%S")
     exif_args << "-DateTimeOriginal='#{taken_time}'"
-  
+
     # Update GPS Data
     lat = data["geoDataExif"]["latitude"]
     lon = data["geoDataExif"]["longitude"]
     alt = data["geoDataExif"]["altitude"]
-  
+
     if lat == 0 && lon == 0 && alt == 0
       exif_args << "-GPSLatitude="
       exif_args << "-GPSLongitude="
@@ -155,7 +153,7 @@ class GAlbumTool
       exif_args << "-GPSLongitude=#{lon}"
       exif_args << "-GPSAltitude=#{alt}"
     end
-  
+
     return if exif_args.empty?
 
     cmd = ["exiftool", "-o", File.join(destination_directory, File.basename(file_path)), *exif_args, file_path]
