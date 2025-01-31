@@ -58,3 +58,4 @@ build-iPhoneSimulator/
 # Custom for this project
 /local_data/
 *.log
+.vscode/
