@@ -8,7 +8,7 @@ require "rchardet"
 class GAlbumTool
   SHOW_COMMAND = false
 
-  IMAGE_EXTENSIONS = %w[jpg jpeg heic dng png gif bmp tiff].freeze
+  IMAGE_EXTENSIONS = %w[jpg jpeg heic dng png gif bmp tiff webp].freeze
   VIDEO_EXTENSIONS = %w[mp4 mov avi mkv].freeze
   SUPPORTED_EXTENSIONS = IMAGE_EXTENSIONS + VIDEO_EXTENSIONS
   LIVE_PHOTO_EXTENSIONS = %w[mov mp4].freeze
@@ -47,11 +47,12 @@ class GAlbumTool
     processed_files.each do |file, info|
       extension = File.extname(file).downcase.delete(".")
 
-      if SUPPORTED_EXTENSIONS.include?(extension)
-        update_metadata(file, read_json(info[:json_file]))
-        info[:processed] = true
+      if info[:json_file]
+        stdout_str, stderr_str, status = update_metadata(file, read_json(info[:json_file]))
+
+        status.success? ? info[:processed] = true : FileUtils.cp(file, File.join(destination_directory, File.basename(file)))
       else
-        log(:info, "Unsupported file type: #{file}")
+        FileUtils.cp(file, File.join(destination_directory, File.basename(file)))
       end
     end
 
@@ -135,6 +136,8 @@ class GAlbumTool
         if json_file = fetch_json_file(media_file, json_files)
           log(:info, "Using JSON file via magic: #{json_file}")
           @processed_files[media_file] = base_status.merge(json_file: json_file)
+        else
+          @processed_files[media_file] = base_status
         end
       else
         @processed_files[media_file] = base_status.merge(json_file: "#{media_file}.json")
@@ -188,13 +191,17 @@ class GAlbumTool
     alt = data["geoDataExif"]["altitude"]
 
     if lat == 0 && lon == 0 && alt == 0
-      exif_args << "-GPSLatitude="
-      exif_args << "-GPSLongitude="
-      exif_args << "-GPSAltitude="
+      exif_args << "-GPSLatitude*="
+      exif_args << "-GPSLongitude*="
+      exif_args << "-GPSAltitude*="
+      # for video files
+      exif_args << "-GPSCoordinates="
     else
-      exif_args << "-GPSLatitude=#{lat}"
-      exif_args << "-GPSLongitude=#{lon}"
-      exif_args << "-GPSAltitude=#{alt}"
+      exif_args << "-GPSLatitude*=#{lat}"
+      exif_args << "-GPSLongitude*=#{lon}"
+      exif_args << "-GPSAltitude*=#{alt}"
+      # for video files
+      exif_args << "-GPSCoordinates=#{lat}, #{lon}, #{alt}"
     end
 
     return if exif_args.empty?
