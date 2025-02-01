@@ -11,17 +11,22 @@ class GAlbumTool
   IMAGE_EXTENSIONS = %w[jpg jpeg heic dng png gif bmp tiff].freeze
   VIDEO_EXTENSIONS = %w[mp4 mov avi mkv].freeze
   SUPPORTED_EXTENSIONS = IMAGE_EXTENSIONS + VIDEO_EXTENSIONS
+  LIVE_PHOTO_EXTENSIONS = %w[mov mp4].freeze
+
   LOG_FILE = "metadata_editor.log".freeze
 
   OFFSET_TIMES_KEYS = %w[OffsetTime OffsetTimeOriginal OffsetTimeDigitized]
   OFFSET_TIMES_PATH = "./local_data/offset_times.csv".freeze
 
-  attr_reader :verbose, :logger, :origin_directory, :destination_directory, :offset_time
+  ALLOWED_SUFFIXES = ["-已編輯", "(1)", " Copy"].freeze
+
+  attr_reader :verbose, :logger, :origin_directory, :destination_directory, :offset_time, :processed_files
 
   def initialize(verbose, origin_directory, destination_directory)
     @verbose = verbose
     @origin_directory = origin_directory
     @destination_directory = destination_directory
+    @processed_files = {}
     @logger = Logger.new(LOG_FILE)
     @logger.level = Logger::INFO
   end
@@ -34,16 +39,20 @@ class GAlbumTool
     media_files = Dir.glob(File.join(origin_directory, "*.{#{SUPPORTED_EXTENSIONS.join(",")}}")).select { |f| File.file?(f) }
     json_files = Dir.glob(File.join(origin_directory, "*.json")).select { |f| File.file?(f) }
 
-    media_files = check_files(media_files, json_files)
-    return log(:info, "No valid media found.") if media_files.empty?
+    check_files(media_files, json_files)
+    return log(:info, "No valid media found.") if processed_files.empty?
 
     load_offset_times
 
-    media_files.each do |file|
+    processed_files.each do |file, info|
       extension = File.extname(file).downcase.delete(".")
-      data = read_json(file)
 
-      SUPPORTED_EXTENSIONS.include?(extension) ? update_metadata(file, data) : log(:info, "Unsupported file type: #{file}")
+      if SUPPORTED_EXTENSIONS.include?(extension)
+        update_metadata(file, read_json(info[:json_file]))
+        info[:processed] = true
+      else
+        log(:info, "Unsupported file type: #{file}")
+      end
     end
 
     log(:info, "Processing completed.", at_console: true)
@@ -76,40 +85,84 @@ class GAlbumTool
     str.force_encoding(encoding).encode("UTF-8").strip
   end
 
-  def execute_command(cmd)
+  def execute_command(cmd, log_result: true)
     log(:info, "Executing: #{cmd.join(" ")}") if SHOW_COMMAND
 
     stdout_str, stderr_str, status = Open3.capture3(*cmd)
 
-    status.success? ? log(:info, "Success: #{clean_string(stdout_str)} #{cmd[2]}") : log(:error, "Failed: #{clean_string(stderr_str)}")
+    if log_result
+      status.success? ? log(:info, "Success: #{clean_string(stdout_str)} #{cmd[2]}") : log(:error, "Failed: #{clean_string(stderr_str)}")
+    end
+
+    [stdout_str, stderr_str, status]
   end
 
-  def read_json(file_path)
-    json_path = "#{file_path}.json"
+  def magic_file_path(file_path, live_photo: false)
+    magic_path = File.join(
+      File.dirname(file_path),
+      File.basename(file_path)
+        .gsub(
+          /#{ALLOWED_SUFFIXES.map { Regexp.quote(_1) }.join("|")}/,
+          ""
+        )
+    )
 
-    begin
-      JSON.parse(File.read(json_path), encoding: "UTF-8")
-    rescue JSON::ParserError => e
-      log(:error, "Invalid JSON format in #{json_path}: #{e.message}")
-      nil
-    end
+    return magic_path unless live_photo
+
+    # remove live photo extension
+    magic_path[0...-4]
+  end
+
+  def read_json(json_path)
+    JSON.parse(File.read(json_path), encoding: "UTF-8")
+  rescue JSON::ParserError => e
+    log(:error, "Invalid JSON format in #{json_path}: #{e.message}")
+    nil
   end
 
   def check_files(media_files, json_files)
-    media_files_from_json = json_files.map { |f| f.match(/(.*)\.json/)[1] }
+    media_files_from_json = json_files.map { _1[0...-5] }
 
     missing_json = media_files - media_files_from_json
     missing_media = media_files_from_json - media_files
 
-    missing_json.each do |file_path|
-      log(:info, "JSON data is missing for media file: #{file_path}")
+    base_status = {json_file: nil, processed: false}
+
+    media_files.each do |media_file|
+      if missing_json.include?(media_file)
+        log(:info, "JSON file is missing for media file: #{media_file}")
+
+        if json_file = fetch_json_file(media_file, json_files)
+          log(:info, "Using JSON file via magic: #{json_file}")
+          @processed_files[media_file] = base_status.merge(json_file: json_file)
+        end
+      else
+        @processed_files[media_file] = base_status.merge(json_file: "#{media_file}.json")
+      end
     end
 
     missing_media.each do |file_path|
-      log(:info, "Media file is missing for JSON data: #{file_path}")
+      log(:info, "Media file is missing for JSON file: #{file_path}")
+    end
+  end
+
+  def fetch_json_file(file_path, json_files)
+    match_file_path = magic_file_path(file_path, live_photo: live_photo?(file_path))
+
+    json_files.each do |json_file|
+      return json_file if magic_file_path(json_file).include?(match_file_path)
     end
 
-    media_files & media_files_from_json
+    nil
+  end
+
+  def live_photo?(file_path)
+    return false unless LIVE_PHOTO_EXTENSIONS.include?(File.extname(file_path).downcase.delete("."))
+
+    cmd = ["exiftool", "-duration", file_path]
+    stdout_str, _, _ = execute_command(cmd, log_result: false)
+
+    stdout_str.match(/Duration *: *(\d+\.\d+) s\n/)[1].to_f < 3
   end
 
   def load_offset_times
@@ -125,11 +178,9 @@ class GAlbumTool
   def update_metadata(file_path, data)
     exif_args = []
 
-    creation_time = Time.at(data.dig("creationTime", "timestamp").to_i, in: offset_time[file_path]).strftime("%Y:%m:%d %H:%M:%S")
-    exif_args << "-FileCreateDate='#{creation_time}'"
-
     taken_time = Time.at(data.dig("photoTakenTime", "timestamp").to_i, in: offset_time[file_path]).strftime("%Y:%m:%d %H:%M:%S")
     exif_args << "-DateTimeOriginal='#{taken_time}'"
+    exif_args << "-FileCreateDate='#{taken_time}'"
 
     # Update GPS Data
     lat = data["geoDataExif"]["latitude"]
