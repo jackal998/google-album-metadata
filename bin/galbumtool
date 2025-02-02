@@ -16,6 +16,8 @@ parser = OptionParser.new do |op|
 
   op.on("-o ORIGIN", "--origin ORIGIN", "Set origin path") { options[:origin] = _1 }
   op.on("-d DEST", "--destination DEST", "Set destination path") { options[:destination] = _1 }
+
+  op.on("--output", "Output the result to a file") { options[:output] = _1 }
 end
 
 begin
@@ -29,7 +31,12 @@ end
 if options[:version]
   puts GAlbumTool::VERSION
 elsif options[:origin] && options[:destination]
-  GAlbumTool.new(options[:verbose], options[:origin], options[:destination]).process
+  GAlbumTool.new(
+    options[:verbose],
+    options[:origin],
+    options[:destination],
+    create_output_csv: options[:output]
+  ).process
 else
   puts parser.help
 end

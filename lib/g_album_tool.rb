@@ -20,15 +20,19 @@ class GAlbumTool
 
   ALLOWED_SUFFIXES = ["-已編輯", "(1)", " Copy"].freeze
 
-  attr_reader :verbose, :logger, :origin_directory, :destination_directory, :offset_time, :processed_files
+  attr_reader :verbose, :logger, :origin_directory, :destination_directory, :offset_time, :processed_files, :output_csv
 
-  def initialize(verbose, origin_directory, destination_directory)
+  def initialize(verbose, origin_directory, destination_directory, create_output_csv: false)
     @verbose = verbose
     @origin_directory = origin_directory
     @destination_directory = destination_directory
     @processed_files = {}
     @logger = Logger.new(LOG_FILE)
     @logger.level = Logger::INFO
+    if create_output_csv
+      @output_csv = File.new(File.join(File.dirname(destination_directory), "#{File.basename(destination_directory)}_output.csv"), "w")
+      @output_csv.puts("Processed,Media File,JSON File,Messages,Errors")
+    end
   end
 
   def process
@@ -45,17 +49,23 @@ class GAlbumTool
     load_offset_times
 
     processed_files.each do |file, info|
-      extension = File.extname(file).downcase.delete(".")
-
       if info[:json_file]
-        stdout_str, stderr_str, status = update_metadata(file, read_json(info[:json_file]))
+        result = update_metadata(file, read_json(info[:json_file]))
 
-        status.success? ? info[:processed] = true : FileUtils.cp(file, File.join(destination_directory, File.basename(file)))
+        if result[:success]
+          info[:processed] = true # not used for now
+          output_csv.puts("true,#{file},#{info[:json_file]},#{result[:messages]},") if output_csv
+        else
+          output_csv.puts("false,#{file},#{info[:json_file]},,#{result[:errors]}") if output_csv
+          FileUtils.cp(file, File.join(destination_directory, File.basename(file)))
+        end
       else
+        output_csv.puts("false,#{file},,,No JSON file found.") if output_csv
         FileUtils.cp(file, File.join(destination_directory, File.basename(file)))
       end
     end
 
+    output_csv.close if output_csv
     log(:info, "Processing completed.", at_console: true)
   end
 
@@ -81,8 +91,9 @@ class GAlbumTool
   end
 
   def clean_string(str)
-    encoding = CharDet.detect(str)["encoding"]
+    return if str.nil? || str.empty?
 
+    encoding = CharDet.detect(str)["encoding"]
     str.force_encoding(encoding).encode("UTF-8").strip
   end
 
@@ -91,8 +102,11 @@ class GAlbumTool
 
     stdout_str, stderr_str, status = Open3.capture3(*cmd)
 
+    stdout_str = clean_string(stdout_str)
+    stderr_str = clean_string(stderr_str)
+
     if log_result
-      status.success? ? log(:info, "Success: #{clean_string(stdout_str)} #{cmd[2]}") : log(:error, "Failed: #{clean_string(stderr_str)}")
+      status.success? ? log(:info, "Success: #{stdout_str} #{cmd[2]}") : log(:error, "Failed: #{stderr_str}")
     end
 
     [stdout_str, stderr_str, status]
@@ -165,7 +179,7 @@ class GAlbumTool
     cmd = ["exiftool", "-duration", file_path]
     stdout_str, _, _ = execute_command(cmd, log_result: false)
 
-    stdout_str.match(/Duration *: *(\d+\.\d+) s\n/)[1].to_f < 3
+    stdout_str.match(/Duration *: *(\d+\.\d+) s/)[1].to_f < 3
   end
 
   def load_offset_times
@@ -207,6 +221,12 @@ class GAlbumTool
     return if exif_args.empty?
 
     cmd = ["exiftool", "-o", File.join(destination_directory, File.basename(file_path)), *exif_args, file_path]
-    execute_command(cmd)
+    stdout_str, stderr_str, status = execute_command(cmd)
+
+    {}.tap do |result|
+      result[:success] = status.success?
+      result[:errors] = clean_string(stderr_str).tr("\n", ";")
+      result[:messages] = clean_string(stdout_str).tr("\n", ";")
+    end
   end
 end
