@@ -20,64 +20,64 @@ class GAlbumTool
 
   ALLOWED_SUFFIXES = ["-已編輯", "(1)", " Copy"].freeze
 
-  attr_reader :verbose, :logger, :origin_directory, :destination_directory, :offset_time, :processed_files, :output_csv
+  attr_reader :verbose, :logger, :origin_directory, :destination_directory, :offset_time, :processed_files, :create_output_csv
 
-  def initialize(verbose, origin_directory, destination_directory, create_output_csv: false)
+  def initialize(verbose, origin_directory, destination_directory, create_output_csv)
     @verbose = verbose
     @origin_directory = origin_directory
     @destination_directory = destination_directory
     @processed_files = {}
     @logger = Logger.new(LOG_FILE)
     @logger.level = Logger::INFO
-    if create_output_csv
-      @output_csv = File.new(File.join(File.dirname(destination_directory), "#{File.basename(destination_directory)}_output.csv"), "w")
-      @output_csv.puts("Processed,Media File,JSON File,Messages,Errors")
-    end
+    @create_output_csv = create_output_csv
   end
 
   def process
-    return unless valid_paths?
+    return log(:error, "Origin directory does not exist: #{origin_directory}") unless Dir.exist?(origin_directory)
 
     log(:info, "Processing files in directory: #{origin_directory}", at_console: true)
 
-    media_files = Dir.glob(File.join(origin_directory, "*.{#{SUPPORTED_EXTENSIONS.join(",")}}")).select { |f| File.file?(f) }
-    json_files = Dir.glob(File.join(origin_directory, "*.json")).select { |f| File.file?(f) }
-
-    check_files(media_files, json_files)
-    return log(:info, "No valid media found.") if processed_files.empty?
+    FileUtils.mkdir_p(destination_directory) unless Dir.exist?(destination_directory)
 
     load_offset_times
 
-    processed_files.each do |file, info|
-      if info[:json_file]
-        result = update_metadata(file, read_json(info[:json_file]))
+    origin_directories = Dir.glob(File.join(origin_directory, "**/"))
+    origin_directories.each do |dir|
+      check_files(dir)
+      next log(:info, "#{dir} No valid media found.") if processed_files[dir].empty?
+      current_destination_directory = dir.gsub(origin_directory, destination_directory)
 
-        if result[:success]
-          info[:processed] = true # not used for now
-          output_csv.puts("true,#{file},#{info[:json_file]},#{result[:messages]},") if output_csv
-        else
-          output_csv.puts("false,#{file},#{info[:json_file]},,#{result[:errors]}") if output_csv
-          FileUtils.cp(file, File.join(destination_directory, File.basename(file)))
-        end
-      else
-        output_csv.puts("false,#{file},,,No JSON file found.") if output_csv
-        FileUtils.cp(file, File.join(destination_directory, File.basename(file)))
+      FileUtils.mkdir_p(current_destination_directory) unless Dir.exist?(current_destination_directory)
+
+      if create_output_csv
+        @output_csv = File.new(File.join(File.dirname(current_destination_directory), "#{File.basename(current_destination_directory)}_output.csv"), "w")
+        @output_csv.puts("Processed,Media File,JSON File,Messages,Errors")
       end
+
+      processed_files[dir].each do |file, info|
+        if info[:json_file]
+          result = update_metadata(file, read_json(info[:json_file]), current_destination_directory)
+
+          if result[:success]
+            info[:processed] = true # not used for now
+            @output_csv.puts("true,#{file},#{info[:json_file]},#{result[:messages]},") if create_output_csv
+          else
+            @output_csv.puts("false,#{file},#{info[:json_file]},,#{result[:errors]}") if create_output_csv
+            FileUtils.cp(file, File.join(current_destination_directory, File.basename(file)))
+          end
+        else
+          @output_csv.puts("false,#{file},,,No JSON file found.") if create_output_csv
+          FileUtils.cp(file, File.join(current_destination_directory, File.basename(file)))
+        end
+      end
+
+      @output_csv.close if create_output_csv
     end
 
-    output_csv.close if output_csv
     log(:info, "Processing completed.", at_console: true)
   end
 
   private
-
-  def valid_paths?
-    dir_exist = [origin_directory, destination_directory].filter_map do |dir|
-      Dir.exist?(dir) || log(:error, "Directory does not exist: #{dir}")
-    end
-
-    !dir_exist.compact.empty?
-  end
 
   def log(level, message, at_console: verbose)
     case level
@@ -135,27 +135,27 @@ class GAlbumTool
     nil
   end
 
-  def check_files(media_files, json_files)
+  def check_files(dir)
+    media_files = Dir.glob(File.join(dir, "*.{#{SUPPORTED_EXTENSIONS.join(",")}}")).select { |f| File.file?(f) }
+    json_files = Dir.glob(File.join(dir, "*.json")).select { |f| File.file?(f) }
+
     media_files_from_json = json_files.map { _1[0...-5] }
 
     missing_json = media_files - media_files_from_json
     missing_media = media_files_from_json - media_files
 
-    base_status = {json_file: nil, processed: false}
+    @processed_files[dir] = {}
 
     media_files.each do |media_file|
-      if missing_json.include?(media_file)
-        log(:info, "JSON file is missing for media file: #{media_file}")
-
-        if json_file = fetch_json_file(media_file, json_files)
-          log(:info, "Using JSON file via magic: #{json_file}")
-          @processed_files[media_file] = base_status.merge(json_file: json_file)
+      json_file =
+        if missing_json.include?(media_file)
+          log(:info, "JSON file is missing for media file: #{media_file}")
+          fetch_json_file(media_file, json_files)
         else
-          @processed_files[media_file] = base_status
+          "#{media_file}.json"
         end
-      else
-        @processed_files[media_file] = base_status.merge(json_file: "#{media_file}.json")
-      end
+
+      @processed_files[dir][media_file] = {json_file: json_file, processed: false}
     end
 
     missing_media.each do |file_path|
@@ -167,7 +167,10 @@ class GAlbumTool
     match_file_path = magic_file_path(file_path, live_photo: live_photo?(file_path))
 
     json_files.each do |json_file|
-      return json_file if magic_file_path(json_file).include?(match_file_path)
+      next unless magic_file_path(json_file).include?(match_file_path)
+
+      log(:info, "Using JSON file via magic: #{json_file}")
+      return json_file
     end
 
     nil
@@ -192,7 +195,7 @@ class GAlbumTool
     end.to_h
   end
 
-  def update_metadata(file_path, data)
+  def update_metadata(file_path, data, current_destination_directory)
     exif_args = []
 
     taken_time = Time.at(data.dig("photoTakenTime", "timestamp").to_i, in: offset_time[file_path]).strftime("%Y:%m:%d %H:%M:%S")
@@ -220,7 +223,7 @@ class GAlbumTool
 
     return if exif_args.empty?
 
-    cmd = ["exiftool", "-o", File.join(destination_directory, File.basename(file_path)), *exif_args, file_path]
+    cmd = ["exiftool", "-o", File.join(current_destination_directory, File.basename(file_path)), *exif_args, file_path]
     stdout_str, stderr_str, status = execute_command(cmd)
 
     {}.tap do |result|

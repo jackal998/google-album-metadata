@@ -35,7 +35,7 @@ elsif options[:origin] && options[:destination]
     options[:verbose],
     options[:origin],
     options[:destination],
-    create_output_csv: options[:output]
+    options[:output]
   ).process
 else
   puts parser.help
