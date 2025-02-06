@@ -20,11 +20,11 @@ class GAlbumTool
 
   ALLOWED_SUFFIXES = ["-已編輯", "(1)", " Copy"].freeze
 
-  attr_reader :verbose, :logger, :origin_directory, :destination_directory, :offset_time, :processed_files, :create_output_csv
+  attr_reader :verbose, :logger, :source_directory, :destination_directory, :offset_time, :processed_files, :create_output_csv
 
-  def initialize(verbose, origin_directory, destination_directory, create_output_csv)
+  def initialize(verbose, source_directory, destination_directory, create_output_csv)
     @verbose = verbose
-    @origin_directory = origin_directory
+    @source_directory = source_directory
     @destination_directory = destination_directory
     @processed_files = {}
     @logger = Logger.new(LOG_FILE)
@@ -33,20 +33,20 @@ class GAlbumTool
   end
 
   def process
-    return log(:error, "Origin directory does not exist: #{origin_directory}") unless Dir.exist?(origin_directory)
+    return log(:error, "Source directory does not exist: #{source_directory}") unless Dir.exist?(source_directory)
 
-    log(:info, "Processing files in directory: #{origin_directory}", at_console: true)
+    log(:info, "Processing files in directory: #{source_directory}", at_console: true)
 
     FileUtils.mkdir_p(destination_directory) unless Dir.exist?(destination_directory)
 
     load_offset_times
 
-    origin_directories = Dir.glob(File.join(origin_directory, "**/"))
-    origin_directories.each do |dir|
+    source_directories = Dir.glob(File.join(source_directory, "**/"))
+    source_directories.each do |dir|
       check_files(dir)
       next log(:info, "#{dir} No valid media found.") if processed_files[dir].empty?
-      current_destination_directory = dir.gsub(origin_directory, destination_directory)
 
+      current_destination_directory = dir.gsub(source_directory, destination_directory)
       FileUtils.mkdir_p(current_destination_directory) unless Dir.exist?(current_destination_directory)
 
       if create_output_csv
@@ -228,8 +228,8 @@ class GAlbumTool
 
     {}.tap do |result|
       result[:success] = status.success?
-      result[:errors] = clean_string(stderr_str).tr("\n", ";")
-      result[:messages] = clean_string(stdout_str).tr("\n", ";")
+      result[:errors] = stderr_str&.tr("\n", ";")
+      result[:messages] = stdout_str&.tr("\n", ";")
     end
   end
 end
