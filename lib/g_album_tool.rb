@@ -182,7 +182,10 @@ class GAlbumTool
     cmd = ["exiftool", "-duration", file_path]
     stdout_str, _, _ = execute_command(cmd, log_result: false)
 
-    stdout_str.match(/Duration *: *(\d+\.\d+) s/)[1].to_f < 3
+    stdout_str.match(/Duration *: (\d+(\.\d+)?)/)[1].to_f < 3
+  rescue NoMethodError => e
+    log(:error, "Failed to get duration for #{file_path}, #{stdout_str}, #{e.message}")
+    false
   end
 
   def load_offset_times
