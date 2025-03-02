@@ -1,0 +1,15 @@
+{
+  "title": "Test Photo",
+  "description": "This is a test photo",
+  "photoTakenTime": {
+    "timestamp": "1609459200",
+    "formatted": "Jan 1, 2021, 12:00:00 AM UTC"
+  },
+  "geoData": {
+    "latitude": 37.7749,
+    "longitude": -122.4194,
+    "altitude": 0,
+    "latitudeSpan": 0.01,
+    "longitudeSpan": 0.01
+  }
+}

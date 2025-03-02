@@ -13,12 +13,21 @@ module GAlbumTools
     SHOW_COMMAND = false
     LOG_FILE = "metadata_editor.log"
 
+    # Platform detection constants
+    WINDOWS = RbConfig::CONFIG["host_os"] =~ /mswin|mingw|cygwin/
+    MAC = RbConfig::CONFIG["host_os"] =~ /darwin/
+    LINUX = RbConfig::CONFIG["host_os"] =~ /linux/
+
     attr_reader :logger, :verbose
 
     def initialize(options = {})
       @verbose = options[:verbose] || false
       @logger = Logger.new(options[:log_file] || LOG_FILE)
       @logger.level = options[:log_level] || Logger::INFO
+      @logger.formatter = proc do |severity, datetime, progname, msg|
+        formatted_datetime = datetime.strftime("%Y-%m-%d %H:%M:%S")
+        "[#{formatted_datetime}] #{severity}: #{msg}\n"
+      end
     end
 
     # Logs a message at the specified level and optionally to the console
@@ -41,6 +50,18 @@ module GAlbumTools
     # @param log_result [Boolean] Whether to log the command output
     # @return [Array] stdout, stderr, status of the command
     def execute_command(cmd, log_result: true)
+      # Handle Windows-specific command adjustments
+      if WINDOWS
+        # Convert forward slashes to backslashes in paths for Windows tools that require it
+        cmd = cmd.map do |arg|
+          if arg.is_a?(String) && arg.include?("/") && !arg.start_with?("-")
+            arg.gsub("/", "\\")
+          else
+            arg
+          end
+        end
+      end
+
       log(:info, "Executing: #{cmd.join(" ")}") if SHOW_COMMAND
 
       stdout_str, stderr_str, status = Open3.capture3(*cmd)
@@ -68,6 +89,39 @@ module GAlbumTools
       end
 
       str
+    end
+
+    # Checks if ExifTool is installed and available
+    # @return [Boolean] true if ExifTool is available
+    def exiftool_available?
+      _, _, status = execute_command(["exiftool", "-ver"], log_result: false)
+      status.success?
+    rescue
+      false
+    end
+
+    # Gets system information for troubleshooting
+    # @return [Hash] System information
+    def system_info
+      {
+        ruby_version: RUBY_VERSION,
+        ruby_platform: RUBY_PLATFORM,
+        operating_system: RbConfig::CONFIG["host_os"],
+        is_windows: WINDOWS,
+        is_mac: MAC,
+        is_linux: LINUX,
+        exiftool_available: exiftool_available?,
+        exiftool_version: exiftool_version
+      }
+    end
+
+    # Gets ExifTool version
+    # @return [String, nil] ExifTool version or nil if not available
+    def exiftool_version
+      stdout, _, status = execute_command(["exiftool", "-ver"], log_result: false)
+      status.success? ? stdout.strip : nil
+    rescue
+      nil
     end
   end
 end

@@ -2,6 +2,34 @@
 
 A command-line tool for processing metadata from Google Photos Takeout files and applying it to your media files.
 
+## Quick Start Guide
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/google-album-metadata.git
+cd google-album-metadata
+
+# Install dependencies
+gem install bundler
+bundle install
+
+# Make the script executable
+chmod +x bin/g_album_tool  # On Unix/macOS
+# On Windows, use: ruby bin/g_album_tool instead
+
+# Process photos from a Google Takeout folder
+bin/g_album_tool process path/to/takeout/folder path/to/destination
+
+# Analyze errors in CSV output files
+bin/g_album_tool analyze path/to/destination
+
+# Fix errors in processed files
+bin/g_album_tool fix-errors path/to/destination
+
+# Display system information for troubleshooting
+bin/g_album_tool info
+```
+
 ## Features
 
 - Extracts metadata from Google Photos JSON files and applies it to corresponding media files
@@ -15,6 +43,7 @@ A command-line tool for processing metadata from Google Photos Takeout files and
 
 - Ruby 2.6 or higher
 - ExifTool
+- Bundler (for dependency management)
 
 ## Installation
 
@@ -24,15 +53,23 @@ A command-line tool for processing metadata from Google Photos Takeout files and
    cd google-album-metadata
    ```
 
-2. Install ExifTool:
+2. Install dependencies:
+   ```
+   gem install bundler  # If bundler is not installed
+   bundle install       # Install dependencies from Gemfile
+   ```
+
+3. Install ExifTool:
    - Mac: `brew install exiftool`
    - Linux: `apt install libimage-exiftool-perl` or equivalent
-   - Windows: Download from [ExifTool website](https://exiftool.org/)
+   - Windows:
+     - Download from [ExifTool website](https://exiftool.org/)
+     - Extract the ZIP file to a directory in your PATH
+     - Rename `exiftool(-k).exe` to `exiftool.exe`
 
-3. Ensure the `bin/g_album_tool` script is executable:
-   ```
-   chmod +x bin/g_album_tool
-   ```
+4. Ensure the `bin/g_album_tool` script is executable:
+   - Unix/macOS: `chmod +x bin/g_album_tool`
+   - Windows: Use `ruby bin/g_album_tool` to run the script
 
 ## Usage
 
@@ -71,6 +108,19 @@ This command will:
 3. Apply appropriate fixes based on error type
 4. Update the files in place and mark them as processed in the CSV
 
+### Display system information
+
+```
+bin/g_album_tool info
+```
+
+This command will:
+1. Show the tool version
+2. Display Ruby version and platform details
+3. Show operating system information
+4. Verify ExifTool installation and version
+5. Provide a summary of system configuration for troubleshooting
+
 ### Options
 
 - `-v, --verbose`: Show detailed output
@@ -97,7 +147,7 @@ See [ERROR_SUMMARY.md](ERROR_SUMMARY.md) for more details on error handling stra
 google-album-metadata/
 ├── bin/
 │   ├── g_album_tool      # Main executable
-│   └── run_tests         # Test runner script
+│   └── g_album_tool.bat  # Windows batch file
 ├── lib/
 │   ├── g_album_tools.rb  # Main module file
 │   └── g_album_tools/    # Module components
@@ -116,16 +166,83 @@ google-album-metadata/
 │       │   └── truncated_media_handler.rb
 │       ├── metadata_processor.rb
 │       └── version.rb
-├── tests/                # Test files
-│   ├── fixtures/         # Test fixtures
-│   └── test_*.rb         # Test files
-├── ARCHITECTURE.md       # Architecture documentation
-├── ERROR_SUMMARY.md      # Error handling documentation
-├── README.md             # This file
-└── spec.md              # Project specifications
+├── spec/                # RSpec test files
+│   ├── features/        # Feature tests
+│   ├── lib/             # Unit tests
+│   └── spec_helper.rb   # Test helper
+├── tests/               # Test fixtures
+│   └── fixtures/        # Test fixtures used by tests
+├── ARCHITECTURE.md      # Architecture documentation
+├── ERROR_SUMMARY.md     # Error handling documentation
+├── README.md            # This file
+└── spec.md             # Project specifications
 ```
 
 For a detailed explanation of the codebase architecture, see [ARCHITECTURE.md](ARCHITECTURE.md).
+
+## Troubleshooting
+
+### Common Issues
+
+1. **"ExifTool not found" error**
+   - Make sure ExifTool is installed and accessible in your PATH
+   - Verify installation by running `exiftool -ver` in your terminal
+   - Windows users: Rename the downloaded executable from `exiftool(-k).exe` to `exiftool.exe`
+   - Run `bin/g_album_tool info` to check if ExifTool is properly detected
+
+2. **Ruby version issues**
+   - Check your Ruby version with `ruby -v`
+   - If your version is older than 2.6, consider using a version manager like RVM or rbenv
+   - The `info` command will show your current Ruby version and platform
+
+3. **Dependency issues**
+   - Run `bundle install` to ensure all dependencies are installed
+   - If encountering issues with specific gems, try `gem install [gem_name]` directly
+
+4. **Windows path issues**
+   - Ensure paths are properly escaped when containing spaces: `"C:\My Photos"`
+   - For UNC paths, use the full format: `\\server\share\folder`
+
+5. **Processing slow or stalls**
+   - Large folders can take significant time to process
+   - Try processing smaller batches of files
+   - Use the `-v` flag to see progress details
+
+6. **File encoding issues**
+   - Non-ASCII characters in filenames may cause issues on some systems
+   - The tool attempts to handle these automatically, but manual renaming might be necessary
+
+### Platform-Specific Notes
+
+#### Windows
+
+- Use `ruby bin/g_album_tool` instead of direct execution
+- Use backslashes or properly escaped forward slashes in paths
+- Terminal encoding issues can occur with non-English file names; set console to UTF-8 with `chcp 65001`
+
+#### macOS
+
+- If permissions issues occur, verify permissions with `ls -la` and fix with `chmod`
+- Catalina and later require explicit permissions for accessing certain directories
+
+#### Linux
+
+- Different distributions may have ExifTool packaged differently; check your package manager
+- Some distributions may require additional libraries for image processing
+
+### Getting Help
+
+For issues not covered here, please:
+1. Run `bin/g_album_tool info` and include the output when seeking help
+2. Check the extensive logs in the created log file
+3. Review the error patterns in ERROR_SUMMARY.md
+4. Open an issue on the GitHub repository with detailed information
+
+## Development
+
+* Run tests: `bundle exec rspec`
+* Check code style: `bundle exec rubocop`
+* Generate documentation: `bundle exec yard`
 
 ## License
 

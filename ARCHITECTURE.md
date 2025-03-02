@@ -8,7 +8,7 @@ This document provides an overview of the Google Album Metadata Tool architectur
 google-album-metadata/
 ├── bin/
 │   ├── g_album_tool           # Main executable
-│   └── run_tests              # Test runner script
+│   └── g_album_tool.bat       # Windows batch file
 ├── lib/
 │   ├── g_album_tools.rb       # Main library file
 │   └── g_album_tools/
@@ -27,12 +27,18 @@ google-album-metadata/
 │       │   └── truncated_media_handler.rb
 │       ├── metadata_processor.rb # JSON metadata processing
 │       └── version.rb         # Version information
+├── spec/                      # RSpec test files
+│   ├── features/              # Feature/integration tests
+│   ├── lib/                   # Unit tests
+│   │   └── g_album_tools/     # Test for specific components
+│   ├── fixtures/              # Test-specific fixtures
+│   └── spec_helper.rb         # RSpec configuration
 ├── tests/
-│   ├── fixtures/              # Test fixtures
-│   │   ├── csv/               # CSV test files
-│   │   ├── destination/       # Destination test files
-│   │   └── media/             # Media test files
-│   └── test_*.rb              # Test files
+│   └── fixtures/              # Test fixtures shared between tests
+├── local_data/                # Legacy files (not used in current version)
+│   ├── bin/                   # Legacy executables
+│   ├── tests/                 # Legacy test files
+│   └── fixtures/              # Legacy test fixtures
 ├── ERROR_SUMMARY.md           # Error handling documentation
 └── README.md                  # Project documentation
 ```
@@ -139,9 +145,10 @@ The application uses a specialized approach for error handling:
 
 The test directory contains:
 
-- Unit tests for each main component
-- Fixtures for testing (CSV files, media files, etc.)
-- A test runner script for easy test execution
+- RSpec unit tests for each main component in `spec/lib/g_album_tools/`
+- Feature/integration tests in `spec/features/`
+- Fixtures for testing in `tests/fixtures/`
+- Spec helper for test configuration in `spec/spec_helper.rb`
 
 ## Design Principles
 

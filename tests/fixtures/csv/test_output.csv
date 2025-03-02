@@ -1,6 +1,0 @@
-Media File,Destination File,Processed,Errors
-tests/fixtures/media/test1.jpg,tests/fixtures/destination/test1.jpg,false,No JSON file found
-tests/fixtures/media/test2.jpg,tests/fixtures/destination/test2.jpg,false,Unknown filename pattern
-tests/fixtures/media/test3.jpg,tests/fixtures/destination/test3.jpg,false,Live photo missing video part
-tests/fixtures/media/test4.mp4,tests/fixtures/destination/test4.mp4,false,Invalid or truncated file
-tests/fixtures/media/test5.jpg,tests/fixtures/destination/test5.jpg,true,

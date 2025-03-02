@@ -1,0 +1,6 @@
+Media File,Destination File,Processed,Errors
+/Users/ej/google-album-metadata/spec/lib/g_album_tools/../../fixtures/media/test1.jpg,/Users/ej/google-album-metadata/spec/lib/g_album_tools/../../fixtures/destination/test1.jpg,false,No JSON file found
+/Users/ej/google-album-metadata/spec/lib/g_album_tools/../../fixtures/media/test2.jpg,/Users/ej/google-album-metadata/spec/lib/g_album_tools/../../fixtures/destination/test2.jpg,false,Unknown filename pattern
+/Users/ej/google-album-metadata/spec/lib/g_album_tools/../../fixtures/media/test3.jpg,/Users/ej/google-album-metadata/spec/lib/g_album_tools/../../fixtures/destination/test3.jpg,false,Live photo missing video part
+/Users/ej/google-album-metadata/spec/lib/g_album_tools/../../fixtures/media/test4.mp4,/Users/ej/google-album-metadata/spec/lib/g_album_tools/../../fixtures/destination/test4.mp4,false,Invalid or truncated file
+/Users/ej/google-album-metadata/spec/lib/g_album_tools/../../fixtures/media/test5.jpg,/Users/ej/google-album-metadata/spec/lib/g_album_tools/../../fixtures/destination/test5.jpg,true,

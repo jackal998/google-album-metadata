@@ -1,0 +1,43 @@
+require:
+  - standard
+  - rubocop-minitest
+  - rubocop-rake
+
+inherit_gem:
+  standard: config/base.yml
+
+AllCops:
+  TargetRubyVersion: 2.6
+  NewCops: enable
+  SuggestExtensions: false
+  Exclude:
+    - 'vendor/**/*'
+    - 'bin/*'
+    - 'local_data/**/*'
+    - 'archive/**/*'
+
+# Project-specific overrides
+Style/StringLiterals:
+  EnforcedStyle: double_quotes
+  
+Style/Documentation:
+  Enabled: true
+  
+Metrics/MethodLength:
+  Max: 25
+  
+Metrics/AbcSize:
+  Max: 25
+  
+Metrics/ClassLength:
+  Max: 300
+  
+Metrics/ModuleLength:
+  Max: 300
+
+Naming/FileName:
+  Exclude:
+    - 'bin/g_album_tool'
+
+Style/FrozenStringLiteralComment:
+  Enabled: false 

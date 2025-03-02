@@ -5,7 +5,7 @@ require_relative "metadata_processor"
 require_relative "error_handler"
 
 module GAlbumTools
-  class CLI
+  class CLI < Base
     attr_reader :options, :parser
 
     def initialize
@@ -15,6 +15,7 @@ module GAlbumTools
         force: false,
         no_csv: false
       }
+      super(@options)
     end
 
     # Parse command line arguments
@@ -29,6 +30,7 @@ module GAlbumTools
         opts.separator "  process SOURCE_DIR DEST_DIR  Process files from SOURCE_DIR and save to DEST_DIR"
         opts.separator "  fix-errors DEST_DIR          Fix errors in already processed files"
         opts.separator "  analyze CSV_DIR              Analyze error CSV files in CSV_DIR (additional utility)"
+        opts.separator "  info                         Display system information for troubleshooting"
         opts.separator ""
 
         opts.separator "Options:"
@@ -70,6 +72,18 @@ module GAlbumTools
 
     # Run the command with the parsed options
     def run
+      # Perform dependency check for commands that require ExifTool
+      if %w[process fix-errors].include?(@command) && !exiftool_available?
+        log(:error, "ERROR: ExifTool is not installed or not available in your PATH", at_console: true)
+        log(:error, "This tool requires ExifTool to function properly.", at_console: true)
+        log(:error, "Please install ExifTool:", at_console: true)
+        log(:error, "  - Mac: brew install exiftool", at_console: true)
+        log(:error, "  - Linux: apt install libimage-exiftool-perl or equivalent", at_console: true)
+        log(:error, "  - Windows: Download from https://exiftool.org/", at_console: true)
+        log(:error, "    and ensure it's in your PATH", at_console: true)
+        exit 1
+      end
+
       case @command
       when "process"
         process_command
@@ -77,6 +91,8 @@ module GAlbumTools
         analyze_command
       when "fix-errors"
         fix_errors_command
+      when "info"
+        show_info_command
       else
         puts @parser
         exit 1
@@ -106,6 +122,8 @@ module GAlbumTools
           puts @parser
           exit 1
         end
+      when "info"
+        # No arguments needed
       when nil
         puts "Error: No command specified"
         puts @parser
@@ -163,6 +181,7 @@ module GAlbumTools
       puts "  Unknown pattern errors: #{stats[:unknown_pattern]}"
       puts "  Live photo missing part errors: #{stats[:live_photo_missing_part]}"
       puts "  Invalid or truncated errors: #{stats[:invalid_or_truncated]}"
+      puts "  Maker notes errors: #{stats[:maker_notes]}" if stats[:maker_notes]
       puts "  Unknown errors: #{stats[:unknown]}"
     end
 
@@ -179,6 +198,28 @@ module GAlbumTools
       )
 
       error_handler.process
+    end
+
+    # Show system info command implementation
+    def show_info_command
+      info = system_info
+
+      puts "Google Album Metadata Tool v#{VERSION}"
+      puts ""
+      puts "System Information:"
+      puts "  Ruby version: #{info[:ruby_version]}"
+      puts "  Ruby platform: #{info[:ruby_platform]}"
+      puts "  Operating system: #{info[:operating_system]}"
+      puts "  Platform: #{(info[:is_windows] ? 'Windows' : (info[:is_mac] ? 'macOS' : (info[:is_linux] ? 'Linux' : 'Unknown')))}"
+      puts ""
+      puts "Dependencies:"
+      puts "  ExifTool available: #{info[:exiftool_available] ? 'Yes' : 'No'}"
+      if info[:exiftool_version]
+        puts "  ExifTool version: #{info[:exiftool_version]}"
+      else
+        puts "  ExifTool: Not found or not in PATH"
+        puts "  Please install ExifTool to use this tool."
+      end
     end
   end
 end
