@@ -51,7 +51,8 @@ GEM
     unicode-emoji (4.0.4)
 
 PLATFORMS
-  x64-mingw-ucrt
+  universal-darwin-24
+  x64-unknown
 
 DEPENDENCIES
   colorize

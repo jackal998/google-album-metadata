@@ -1,0 +1,5 @@
+#!/usr/bin/env ruby
+
+require_relative "../lib/g_album_tools/cli"
+
+GAlbumTools::CLI.new.run 
