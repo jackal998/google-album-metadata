@@ -53,3 +53,58 @@ After analyzing 31 CSV files containing processing results for 13,778 files, we 
   - Log as corrupted file
   - No fix attempted as these are usually corrupted beyond repair
   - Mark as not processed, need to be fixed manually
+
+## How to Fix These Errors
+
+### No JSON File
+1. Locate the corresponding JSON file for the media.
+2. Ensure it's named correctly to match the media file name pattern.
+3. Place the JSON file in the same directory as the media file.
+
+### Unknown Filename Pattern
+1. Rename the file to match one of the expected patterns (see below).
+2. Alternatively, you may need to add a new pattern to the allowed patterns configuration.
+
+### Live Photo Missing Part
+1. Locate the missing part (image or video) of the live photo.
+2. Ensure both parts are named according to the same pattern.
+3. Place both files in the same directory.
+
+### Invalid or Truncated File
+1. Try downloading the file again from Google Photos.
+2. Check if the file is corrupted by opening it in a media viewer.
+
+### Maker Notes Errors
+1. Use ExifTool with the `-m` flag to ignore minor errors.
+2. This is automatically attempted during the error fixing process.
+
+### Incorrect File Extensions
+1. Verify the actual file type using the `file` command on Linux/Mac or properties on Windows.
+2. Rename the file with the correct extension.
+3. The `fix-errors` command can correct this automatically.
+
+### Truncated Media
+1. Download a fresh copy of the file from Google Photos.
+2. Verify the file integrity with media viewers.
+
+## Windows-Specific Troubleshooting
+
+When running this tool on Windows systems, you may encounter additional issues:
+
+### Command Line Encoding
+- If filenames with special characters appear corrupted, run `chcp 65001` before running the tool
+- Alternatively, use PowerShell with proper UTF-8 encoding settings
+
+### Path Issues
+- Windows has path length limitations (260 characters by default)
+- If processing fails for deeply nested directories, use shorter paths or enable long path support
+  (requires Windows 10 version 1607 or later with appropriate registry settings)
+
+### ExifTool Issues
+- Ensure ExifTool is properly renamed from `exiftool(-k).exe` to `exiftool.exe`
+- Verify ExifTool is in your PATH by running `where exiftool.exe` in Command Prompt
+- If using PowerShell, try `Get-Command exiftool.exe` to verify installation
+
+### Permissions Errors
+- Run Command Prompt or PowerShell as Administrator if encountering access denied errors
+- Check Windows Defender or antivirus software if file operations are being blocked

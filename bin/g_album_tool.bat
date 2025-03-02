@@ -1,38 +1,49 @@
 @echo off
-setlocal enabledelayedexpansion
-
-REM Set UTF-8 encoding for better international character support
+REM Set UTF-8 encoding for command output
 chcp 65001 > nul
 
 REM Check if Ruby is installed
-where ruby >nul 2>nul
-if %ERRORLEVEL% neq 0 (
-  echo Ruby is not installed or not in PATH.
+ruby --version > nul 2>&1
+if %ERRORLEVEL% NEQ 0 (
+  echo ERROR: Ruby is not installed or not in your PATH
   echo Please install Ruby from https://rubyinstaller.org/
   exit /b 1
 )
 
 REM Check if ExifTool is installed
-where exiftool >nul 2>nul
-if %ERRORLEVEL% neq 0 (
-  echo Warning: ExifTool is not found in PATH.
-  echo The application requires ExifTool to function properly.
-  echo Please install it from https://exiftool.org/
-  echo Then rename exiftool(-k).exe to exiftool.exe and place it in your PATH.
+exiftool -ver > nul 2>&1
+if %ERRORLEVEL% NEQ 0 (
+  echo WARNING: ExifTool was not found in your PATH
+  echo This tool requires ExifTool to function properly.
+  echo Please download from https://exiftool.org/ and ensure it's renamed to exiftool.exe
+  echo and placed in a directory in your PATH.
   echo.
-  echo Press any key to continue anyway or Ctrl+C to abort...
-  pause > nul
+  echo Attempting to continue anyway...
+  echo.
 )
 
-REM Get the directory of this batch file
+REM Get the directory where the batch file is located
 set SCRIPT_DIR=%~dp0
 
-REM Execute the Ruby script with all arguments
-ruby "!SCRIPT_DIR!g_album_tool" %*
+REM Navigate to the parent directory (project root)
+cd /d "%SCRIPT_DIR%.."
 
-if %ERRORLEVEL% neq 0 (
-  echo Execution failed with error code %ERRORLEVEL%
-  echo Please check the logs for details.
+REM Check if bundler is installed
+gem list -i bundler > nul 2>&1
+if %ERRORLEVEL% NEQ 0 (
+  echo Installing bundler...
+  gem install bundler
+  if %ERRORLEVEL% NEQ 0 (
+    echo ERROR: Failed to install bundler
+    exit /b 1
+  )
 )
 
-endlocal 
+REM Run the Ruby script with all arguments passed to this batch file
+ruby -I lib bin/g_album_tool %*
+if %ERRORLEVEL% NEQ 0 (
+  echo ERROR: Command failed with exit code %ERRORLEVEL%
+  exit /b %ERRORLEVEL%
+)
+
+exit /b 0 

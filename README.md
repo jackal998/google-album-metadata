@@ -63,9 +63,14 @@ bin/g_album_tool info
    - Mac: `brew install exiftool`
    - Linux: `apt install libimage-exiftool-perl` or equivalent
    - Windows:
-     - Download from [ExifTool website](https://exiftool.org/)
-     - Extract the ZIP file to a directory in your PATH
-     - Rename `exiftool(-k).exe` to `exiftool.exe`
+     - Download Ruby installer from [RubyInstaller](https://rubyinstaller.org/) (version 2.6 or later)
+     - During installation, check "Add Ruby executables to your PATH"
+     - Download ExifTool from [ExifTool website](https://exiftool.org/)
+     - **Important**: Rename `exiftool(-k).exe` to `exiftool.exe`
+     - Add the directory containing ExifTool to your PATH or place it in a directory that's already in your PATH
+     - Open Command Prompt and navigate to the project directory
+     - Run `gem install bundler` and then `bundle install`
+     - Run `bin\g_album_tool.bat info` to verify installation
 
 4. Ensure the `bin/g_album_tool` script is executable:
    - Unix/macOS: `chmod +x bin/g_album_tool`
@@ -192,6 +197,7 @@ For a detailed explanation of the codebase architecture, see [ARCHITECTURE.md](A
    - Make sure ExifTool is installed and accessible in your PATH
    - Verify installation by running `exiftool -ver` in your terminal
    - Windows users: Rename the downloaded executable from `exiftool(-k).exe` to `exiftool.exe`
+   - Windows users: After renaming, ensure the directory containing ExifTool is in your PATH
    - Run `bin/g_album_tool info` to check if ExifTool is properly detected
 
 2. **Ruby version issues**
@@ -255,3 +261,14 @@ MIT License
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+### Windows-Specific Issues
+
+1. **Command Prompt encoding issues**
+   - If you see garbled characters in filenames, try running `chcp 65001` before running the tool
+   - For PowerShell, you may need to set `$OutputEncoding = [System.Text.Encoding]::UTF8`
+   - The batch file `g_album_tool.bat` already sets UTF-8 encoding, but manual adjustment may be needed
+
+2. **Path too long errors**
+   - Windows has path length limitations that could cause issues with deeply nested directories
+   - Try using a shorter destination path if you encounter such errors

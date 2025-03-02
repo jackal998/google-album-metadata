@@ -4,7 +4,7 @@ require "json"
 
 # Setup script for test fixtures
 module TestFixtures
-  FIXTURES_ROOT = File.expand_path(File.dirname(__FILE__))
+  FIXTURES_ROOT = __dir__
 
   class << self
     def setup_all

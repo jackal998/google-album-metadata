@@ -55,16 +55,35 @@ module GAlbumTools
         # Convert forward slashes to backslashes in paths for Windows tools that require it
         cmd = cmd.map do |arg|
           if arg.is_a?(String) && arg.include?("/") && !arg.start_with?("-")
-            arg.gsub("/", "\\")
+            arg.tr("/", "\\")
           else
             arg
           end
+        end
+
+        # For Windows, ensure ExifTool is invoked correctly with .exe extension if needed
+        if cmd[0] == "exiftool" && !cmd[0].end_with?(".exe")
+          # First check if exiftool.exe exists in PATH
+          exiftool_exe_exists = system("where exiftool.exe >nul 2>nul")
+          cmd[0] = "exiftool.exe" if exiftool_exe_exists
         end
       end
 
       log(:info, "Executing: #{cmd.join(" ")}") if SHOW_COMMAND
 
-      stdout_str, stderr_str, status = Open3.capture3(*cmd)
+      # Handle potential encoding issues, especially on Windows
+      old_external_encoding = Encoding.default_external
+      begin
+        # Temporarily set UTF-8 as default encoding for command execution
+        Encoding.default_external = Encoding::UTF_8 if WINDOWS
+        stdout_str, stderr_str, status = Open3.capture3(*cmd)
+      rescue => e
+        log(:error, "Command execution failed: #{e.message}")
+        return ["", "Command execution failed: #{e.message}", OpenStruct.new(success?: false)]
+      ensure
+        # Restore original encoding
+        Encoding.default_external = old_external_encoding if WINDOWS
+      end
 
       if log_result
         log(:info, "Result: #{stdout_str}") unless stdout_str.empty?

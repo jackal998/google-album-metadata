@@ -1,10 +1,10 @@
-require 'spec_helper'
+require "spec_helper"
 
 RSpec.describe GAlbumTools::ErrorHandler do
-  let(:test_dir) { File.join(File.dirname(__FILE__), '..', '..', 'fixtures') }
-  let(:csv_dir) { File.join(test_dir, 'csv') }
-  let(:media_dir) { File.join(test_dir, 'media') }
-  let(:dest_dir) { File.join(test_dir, 'destination') }
+  let(:test_dir) { File.join(File.dirname(__FILE__), "..", "..", "fixtures") }
+  let(:csv_dir) { File.join(test_dir, "csv") }
+  let(:media_dir) { File.join(test_dir, "media") }
+  let(:dest_dir) { File.join(test_dir, "destination") }
   let(:handler) { described_class.new(verbose: true) }
 
   before(:each) do
@@ -25,36 +25,36 @@ RSpec.describe GAlbumTools::ErrorHandler do
     # FileUtils.rm_rf(test_dir) if File.directory?(test_dir)
   end
 
-  describe '#categorize_error' do
-    it 'categorizes no json errors correctly' do
+  describe "#categorize_error" do
+    it "categorizes no json errors correctly" do
       expect(handler.categorize_error("No JSON file found")).to eq(:no_json)
       expect(handler.categorize_error("Could not find JSON metadata")).to eq(:no_json)
     end
 
-    it 'categorizes unknown pattern errors correctly' do
+    it "categorizes unknown pattern errors correctly" do
       expect(handler.categorize_error("Unknown filename pattern")).to eq(:unknown_pattern)
       expect(handler.categorize_error("Filename does not match expected pattern")).to eq(:unknown_pattern)
     end
 
-    it 'categorizes live photo missing part errors correctly' do
+    it "categorizes live photo missing part errors correctly" do
       expect(handler.categorize_error("Live photo missing video part")).to eq(:live_photo_missing_part)
       expect(handler.categorize_error("Could not find corresponding image file")).to eq(:live_photo_missing_part)
     end
 
-    it 'categorizes invalid or truncated file errors correctly' do
+    it "categorizes invalid or truncated file errors correctly" do
       expect(handler.categorize_error("Invalid or truncated file")).to eq(:invalid_or_truncated)
       expect(handler.categorize_error("File is truncated")).to eq(:invalid_or_truncated)
     end
 
-    it 'categorizes unknown errors correctly' do
+    it "categorizes unknown errors correctly" do
       expect(handler.categorize_error("Some other random error")).to eq(:unknown)
       expect(handler.categorize_error("")).to eq(:unknown)
       expect(handler.categorize_error(nil)).to eq(:unknown)
     end
   end
 
-  describe '#load_errors_from_csv' do
-    it 'loads errors from CSV correctly' do
+  describe "#load_errors_from_csv" do
+    it "loads errors from CSV correctly" do
       errors = handler.load_errors_from_csv([File.join(csv_dir, "test_output.csv")])
 
       expect(errors.size).to eq(4)
@@ -67,8 +67,8 @@ RSpec.describe GAlbumTools::ErrorHandler do
     end
   end
 
-  describe '#error_stats' do
-    it 'generates correct error statistics' do
+  describe "#error_stats" do
+    it "generates correct error statistics" do
       errors = handler.load_errors_from_csv([File.join(csv_dir, "test_output.csv")])
       stats = handler.error_stats(errors)
 

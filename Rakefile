@@ -8,7 +8,7 @@ rescue LoadError
 end
 
 # Set default task to run RSpec tests
-task :default => [:spec]
+task default: [:spec]
 
 # Define documentation task with YARD
 YARD::Rake::YardocTask.new do |t|

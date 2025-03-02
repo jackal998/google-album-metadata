@@ -10,8 +10,16 @@ module GAlbumTools
 
     # Process a directory of files
     # @param dir [String] Source directory
-    # @param current_destination_directory [String] Destination directory
-    def process_directory(dir, current_destination_directory)
+    def process_directory(dir)
+      # Calculate the destination directory for this source directory
+      rel_path = dir.sub(@source_directory, "")
+      current_destination_directory = File.join(@destination_directory, rel_path)
+      FileUtils.mkdir_p(current_destination_directory) unless File.directory?(current_destination_directory)
+
+      # First call check_files to populate processed_files for this directory
+      check_files(dir)
+
+      # Then process each file
       processed_files[dir].each do |file_info|
         file_path = file_info[:media_file]
         data = file_info[:data]

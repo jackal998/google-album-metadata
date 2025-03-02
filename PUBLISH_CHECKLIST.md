@@ -50,6 +50,17 @@ This checklist confirms that the Google Album Metadata Tool is ready for public 
 - [x] No hard-coded personal paths or information
 - [x] Complete installation instructions provided
 
+## Pre-release Checks
+
+- [x] All tests pass (`bundle exec rspec`)
+- [x] All classes and methods have proper documentation
+- [x] All user-facing outputs are clear and helpful
+- [x] Error handling is robust and informative
+- [x] Gemfile dependencies are up to date
+- [x] Version number is set (1.0.1)
+- [x] Windows compatibility is tested and enhanced
+- [x] All file paths use File.join for cross-platform compatibility
+
 ## Next Steps After Publication
 
 1. Consider creating a Ruby gem for easier installation

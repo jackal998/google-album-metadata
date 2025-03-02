@@ -210,10 +210,18 @@ module GAlbumTools
       puts "  Ruby version: #{info[:ruby_version]}"
       puts "  Ruby platform: #{info[:ruby_platform]}"
       puts "  Operating system: #{info[:operating_system]}"
-      puts "  Platform: #{(info[:is_windows] ? 'Windows' : (info[:is_mac] ? 'macOS' : (info[:is_linux] ? 'Linux' : 'Unknown')))}"
+      puts "  Platform: #{if info[:is_windows]
+                            "Windows"
+                          else
+                            (if info[:is_mac]
+                               "macOS"
+                             else
+                               (info[:is_linux] ? "Linux" : "Unknown")
+                             end)
+                          end}"
       puts ""
       puts "Dependencies:"
-      puts "  ExifTool available: #{info[:exiftool_available] ? 'Yes' : 'No'}"
+      puts "  ExifTool available: #{info[:exiftool_available] ? "Yes" : "No"}"
       if info[:exiftool_version]
         puts "  ExifTool version: #{info[:exiftool_version]}"
       else
