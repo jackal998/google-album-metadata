@@ -5,6 +5,7 @@ module GAlbumTools
     UNKNOWN_PATTERN_ERROR = :unknown_pattern
     LIVE_PHOTO_MISSING_PART_ERROR = :live_photo_missing_part
     INVALID_OR_TRUNCATED_ERROR = :invalid_or_truncated
+    MAKER_NOTES_ERROR = :maker_notes
     UNKNOWN_ERROR = :unknown
 
     # Error patterns for matching
@@ -34,6 +35,12 @@ module GAlbumTools
       /File is truncated/i
     ]
 
+    MAKER_NOTES_PATTERNS = [
+      /Maker notes could not be parsed/i,
+      /\[minor\] Maker notes/i,
+      /Error processing maker notes/i
+    ]
+
     # Categorize error message into a specific error type
     # @param error_message [String] The error message to categorize
     # @return [Symbol] The error type
@@ -48,6 +55,8 @@ module GAlbumTools
         LIVE_PHOTO_MISSING_PART_ERROR
       elsif INVALID_OR_TRUNCATED_PATTERNS.any? { |pattern| error_message.match?(pattern) }
         INVALID_OR_TRUNCATED_ERROR
+      elsif MAKER_NOTES_PATTERNS.any? { |pattern| error_message.match?(pattern) }
+        MAKER_NOTES_ERROR
       else
         UNKNOWN_ERROR
       end
@@ -62,6 +71,7 @@ module GAlbumTools
         unknown_pattern: 0,
         live_photo_missing_part: 0,
         invalid_or_truncated: 0,
+        maker_notes: 0,
         unknown: 0,
         total: errors.size
       }
@@ -76,6 +86,8 @@ module GAlbumTools
           stats[:live_photo_missing_part] += 1
         when INVALID_OR_TRUNCATED_ERROR
           stats[:invalid_or_truncated] += 1
+        when MAKER_NOTES_ERROR
+          stats[:maker_notes] += 1
         else
           stats[:unknown] += 1
         end

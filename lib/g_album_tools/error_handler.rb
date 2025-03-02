@@ -24,6 +24,7 @@ module GAlbumTools
         unknown_pattern: 0,
         live_photo_missing_part: 0,
         invalid_or_truncated: 0,
+        maker_notes: 0,
         total: 0
       }
     end
@@ -49,6 +50,7 @@ module GAlbumTools
       log(:info, "  Unknown pattern: #{@fixed_errors[:unknown_pattern]}")
       log(:info, "  Live photo missing part: #{@fixed_errors[:live_photo_missing_part]}")
       log(:info, "  Invalid or truncated: #{@fixed_errors[:invalid_or_truncated]}")
+      log(:info, "  Maker notes: #{@fixed_errors[:maker_notes]}")
       log(:info, "  Total fixed: #{@fixed_errors[:total]}")
     end
 
@@ -242,6 +244,8 @@ module GAlbumTools
         Handlers::MetadataHandler
       when :invalid_or_truncated
         Handlers::TruncatedMediaHandler
+      when :maker_notes
+        Handlers::MakerNotesHandler
       else
         Handlers::DefaultHandler
       end
