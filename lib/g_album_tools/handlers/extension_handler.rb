@@ -13,11 +13,11 @@ module GAlbumTools
         current_file = row["Media File"]
         dir_name = File.dirname(current_file)
         base_name = File.basename(current_file, ".*")
-        current_ext = File.extname(current_file).downcase
+        File.extname(current_file).downcase
         expected_ext = ".#{error_data[:expected_extension].downcase}"
 
         # Create the new filename
-        new_file = File.join(dir_name, "#{base_name}#{expected_ext}")
+        File.join(dir_name, "#{base_name}#{expected_ext}")
 
         # Build the destination file paths
         dest_dir = File.dirname(row["Destination File"] || current_file)
@@ -43,7 +43,7 @@ module GAlbumTools
             dest_file_new
           ]
 
-          stdout_str, stderr_str, status = execute_command(cmd)
+          _, stderr_str, status = execute_command(cmd)
 
           if status.success?
             log(:info, "Updated metadata for: #{dest_file_new}")

@@ -1,12 +1,12 @@
 #!/usr/bin/env ruby
 
-require 'minitest/autorun'
-require_relative '../lib/g_album_tools'
+require "minitest/autorun"
+require_relative "../lib/g_album_tools"
 
 class TestFileProcessor < Minitest::Test
   def setup
-    @test_source_dir = File.join(File.dirname(__FILE__), 'fixtures', 'source')
-    @test_dest_dir = File.join(File.dirname(__FILE__), 'fixtures', 'destination')
+    @test_source_dir = File.join(File.dirname(__FILE__), "fixtures", "source")
+    @test_dest_dir = File.join(File.dirname(__FILE__), "fixtures", "destination")
 
     # Create test directories if they don't exist
     FileUtils.mkdir_p(@test_source_dir)
@@ -35,15 +35,15 @@ class TestFileProcessor < Minitest::Test
   end
 
   def test_is_allowed_file_format
-    assert @processor.is_allowed_file_format?('test.jpg')
-    assert @processor.is_allowed_file_format?('test.jpeg')
-    assert @processor.is_allowed_file_format?('test.png')
-    assert @processor.is_allowed_file_format?('test.mp4')
-    assert @processor.is_allowed_file_format?('test.mov')
+    assert @processor.is_allowed_file_format?("test.jpg")
+    assert @processor.is_allowed_file_format?("test.jpeg")
+    assert @processor.is_allowed_file_format?("test.png")
+    assert @processor.is_allowed_file_format?("test.mp4")
+    assert @processor.is_allowed_file_format?("test.mov")
 
-    refute @processor.is_allowed_file_format?('test.txt')
-    refute @processor.is_allowed_file_format?('test.pdf')
-    refute @processor.is_allowed_file_format?('test.doc')
+    refute @processor.is_allowed_file_format?("test.txt")
+    refute @processor.is_allowed_file_format?("test.pdf")
+    refute @processor.is_allowed_file_format?("test.doc")
   end
 
   def test_live_photo_detection

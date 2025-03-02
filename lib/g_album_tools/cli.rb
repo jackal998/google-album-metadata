@@ -12,7 +12,8 @@ module GAlbumTools
       @options = {
         verbose: false,
         nested: false,
-        force: false
+        force: false,
+        no_csv: false
       }
     end
 
@@ -25,9 +26,9 @@ module GAlbumTools
         opts.separator ""
 
         opts.separator "Commands:"
-        opts.separator "  process SOURCE_DIR DESTINATION_DIR  Process files from SOURCE_DIR and save to DESTINATION_DIR"
-        opts.separator "  analyze CSV_DIR                     Analyze error CSV files in CSV_DIR"
-        opts.separator "  fix-errors SOURCE_DIR DESTINATION_DIR Fix files with errors"
+        opts.separator "  process SOURCE_DIR DEST_DIR  Process files from SOURCE_DIR and save to DEST_DIR"
+        opts.separator "  fix-errors DEST_DIR          Fix errors in already processed files"
+        opts.separator "  analyze CSV_DIR              Analyze error CSV files in CSV_DIR (additional utility)"
         opts.separator ""
 
         opts.separator "Options:"
@@ -39,8 +40,8 @@ module GAlbumTools
           @options[:nested] = true
         end
 
-        opts.on("-f", "--force", "Force overwrite existing files") do
-          @options[:force] = true
+        opts.on("--no-csv", "Disable CSV output file creation") do
+          @options[:no_csv] = true
         end
 
         opts.on("-o", "--offset-file FILE", "CSV file with offset times") do |file|
@@ -100,8 +101,8 @@ module GAlbumTools
           exit 1
         end
       when "fix-errors"
-        if @command_args.size != 2
-          puts "Error: 'fix-errors' command requires SOURCE_DIR and DESTINATION_DIR"
+        if @command_args.size != 1
+          puts "Error: 'fix-errors' command requires DEST_DIR"
           puts @parser
           exit 1
         end
@@ -127,7 +128,8 @@ module GAlbumTools
         nested: @options[:nested],
         verbose: @options[:verbose],
         force: @options[:force],
-        offset_file: @options[:offset_file]
+        offset_file: @options[:offset_file],
+        no_csv: @options[:no_csv]
       )
 
       processor.process
@@ -166,26 +168,17 @@ module GAlbumTools
 
     # Fix errors command implementation
     def fix_errors_command
-      source_dir = @command_args[0]
-      destination_dir = @command_args[1]
+      dest_dir = @command_args[0]
 
-      # Find all CSV files in the source directory
-      csv_files = Dir.glob(File.join(source_dir, "**", "*_output.csv"))
+      # Updated to match spec.md, using destination directory as both
+      # source and destination. Files will be fixed in place.
+      error_handler = ErrorHandler.new(
+        destination_directory: dest_dir,
+        nested: @options[:nested],
+        verbose: @options[:verbose]
+      )
 
-      if csv_files.empty?
-        puts "No CSV files found in #{source_dir}"
-        exit 1
-      end
-
-      error_handler = ErrorHandler.new(verbose: @options[:verbose])
-      errors = error_handler.load_errors_from_csv(csv_files)
-
-      if errors.empty?
-        puts "No errors found in CSV files"
-        exit 0
-      end
-
-      error_handler.fix_errors(destination_dir)
+      error_handler.process
     end
   end
 end

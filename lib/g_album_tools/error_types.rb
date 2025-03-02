@@ -41,15 +41,15 @@ module GAlbumTools
       return UNKNOWN_ERROR if error_message.nil? || error_message.empty?
 
       if NO_JSON_PATTERNS.any? { |pattern| error_message.match?(pattern) }
-        return NO_JSON_ERROR
+        NO_JSON_ERROR
       elsif UNKNOWN_PATTERN_PATTERNS.any? { |pattern| error_message.match?(pattern) }
-        return UNKNOWN_PATTERN_ERROR
+        UNKNOWN_PATTERN_ERROR
       elsif LIVE_PHOTO_MISSING_PART_PATTERNS.any? { |pattern| error_message.match?(pattern) }
-        return LIVE_PHOTO_MISSING_PART_ERROR
+        LIVE_PHOTO_MISSING_PART_ERROR
       elsif INVALID_OR_TRUNCATED_PATTERNS.any? { |pattern| error_message.match?(pattern) }
-        return INVALID_OR_TRUNCATED_ERROR
+        INVALID_OR_TRUNCATED_ERROR
       else
-        return UNKNOWN_ERROR
+        UNKNOWN_ERROR
       end
     end
 

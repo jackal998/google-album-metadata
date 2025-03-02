@@ -4,7 +4,7 @@ require "csv"
 module GAlbumTools
   class MetadataProcessor < FileProcessor
     def initialize(options = {})
-      super(options)
+      super
       @output_data = {}
     end
 
@@ -76,7 +76,10 @@ module GAlbumTools
       add_offset_time_metadata(exif_args, file_path)
 
       # Execute exiftool command to copy file and update metadata in one step
-      unless exif_args.empty?
+      if exif_args.empty?
+        # Just copy the file if no metadata to update
+        FileUtils.cp(file_path, destination_file)
+      else
         cmd = [
           "exiftool",
           *EXIFTOOL_COMMON_OPTIONS,
@@ -87,14 +90,11 @@ module GAlbumTools
           file_path
         ]
 
-        stdout_str, stderr_str, status = execute_command(cmd)
+        _, stderr_str, status = execute_command(cmd)
 
         unless status.success?
           raise "Failed to update metadata: #{stderr_str}"
         end
-      else
-        # Just copy the file if no metadata to update
-        FileUtils.cp(file_path, destination_file)
       end
     end
 
@@ -147,8 +147,8 @@ module GAlbumTools
         exif_args << "-GPSAltitude=#{alt}"
 
         # Set latitude/longitude reference based on value
-        exif_args << "-GPSLatitudeRef=#{lat >= 0 ? 'N' : 'S'}"
-        exif_args << "-GPSLongitudeRef=#{lng >= 0 ? 'E' : 'W'}"
+        exif_args << "-GPSLatitudeRef=#{(lat >= 0) ? "N" : "S"}"
+        exif_args << "-GPSLongitudeRef=#{(lng >= 0) ? "E" : "W"}"
       end
     end
 

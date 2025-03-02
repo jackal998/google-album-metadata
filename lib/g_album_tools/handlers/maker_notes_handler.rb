@@ -42,18 +42,18 @@ module GAlbumTools
           dest_file
         ]
 
-        stdout_str, stderr_str, status = execute_command(cmd)
+        _, stderr_str, status = execute_command(cmd)
 
         if status.success?
           log(:info, "Successfully updated metadata while ignoring maker notes: #{dest_file}")
-          return true
+          true
         else
           log(:error, "Failed to update metadata: #{stderr_str}")
 
           # Even if the command fails, we'll mark this as handled
           # since maker notes errors are minor and don't prevent
           # the file from being used
-          return true
+          true
         end
       end
     end

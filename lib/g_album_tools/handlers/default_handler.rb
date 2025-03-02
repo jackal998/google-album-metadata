@@ -44,7 +44,7 @@ module GAlbumTools
           dest_file
         ]
 
-        stdout_str, stderr_str, status = execute_command(cmd)
+        _, stderr_str, status = execute_command(cmd)
 
         if status.success?
           log(:info, "Applied basic metadata to: #{dest_file}")

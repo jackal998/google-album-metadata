@@ -18,7 +18,6 @@ module GAlbumTools
           when "extension"
             ExtensionUpdater.new(row, error_info[:data]).call
           end
-
         end
       end
     end

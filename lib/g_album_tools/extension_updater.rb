@@ -9,7 +9,7 @@ module GAlbumTools
 
     def call
       binding.pry
-      
+
       cmd = [
         "exiftool",
         "-ext",
@@ -17,8 +17,8 @@ module GAlbumTools
         "-FileName=#{File.basename(row["Media File"], ".*")}.#{error_info[:expected_extension].downcase}",
         row["Media File"]
       ]
-      
-      stdout_str, stderr_str, status = Open3.capture3(*cmd)
+
+      _, _, _ = Open3.capture3(*cmd)
     end
 
     private

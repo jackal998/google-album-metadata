@@ -1,13 +1,13 @@
-require_relative 'base'
-require 'json'
-require 'fileutils'
+require_relative "base"
+require "json"
+require "fileutils"
 
 module GAlbumTools
   class FileProcessor < Base
     attr_reader :source_directory, :destination_directory, :processed_files, :offset_time
 
     def initialize(options = {})
-      super(options)
+      super
       @source_directory = options[:source_directory]
       @destination_directory = options[:destination_directory]
       @nested = options[:nested] || false
@@ -77,27 +77,25 @@ module GAlbumTools
         end
 
       media_files.each do |file|
-        begin
-          ext = File.extname(file).downcase
-          # Skip files that don't match allowed formats
-          unless is_allowed_file_format?(file)
-            log(:debug, "Skipping file with unsupported format: #{file}")
-            next
-          end
-
-          is_live = live_photo?(file)
-          json_file = metadata_file_path(file)
-
-          if json_file
-            data = read_json(json_file)
-            @processed_files[dir] << { media_file: file, json_file: json_file, data: data, is_live_photo: is_live }
-          else
-            # Add without JSON data, will be handled as an error case
-            @processed_files[dir] << { media_file: file, json_file: nil, data: {}, is_live_photo: is_live }
-          end
-        rescue => e
-          log(:error, "Error processing file #{file}: #{e.message}")
+        File.extname(file).downcase
+        # Skip files that don't match allowed formats
+        unless is_allowed_file_format?(file)
+          log(:debug, "Skipping file with unsupported format: #{file}")
+          next
         end
+
+        is_live = live_photo?(file)
+        json_file = metadata_file_path(file)
+
+        if json_file
+          data = read_json(json_file)
+          @processed_files[dir] << {media_file: file, json_file: json_file, data: data, is_live_photo: is_live}
+        else
+          # Add without JSON data, will be handled as an error case
+          @processed_files[dir] << {media_file: file, json_file: nil, data: {}, is_live_photo: is_live}
+        end
+      rescue => e
+        log(:error, "Error processing file #{file}: #{e.message}")
       end
 
       log(:info, "Found #{@processed_files[dir].size} files to process in #{dir}")
@@ -116,7 +114,7 @@ module GAlbumTools
       # Google sometimes adds a (1), (2), etc. to the filename, but the JSON keeps the original name
       # Try with different patterns
       ALLOWED_FILENAME_SUFFIXES.each do |suffix|
-        base_without_suffix = base_name.gsub(/#{Regexp.escape(suffix)}$/, '')
+        base_without_suffix = base_name.gsub(/#{Regexp.escape(suffix)}$/, "")
         json_path = File.join(dir_name, "#{base_without_suffix}.json")
         return json_path if File.exist?(json_path)
       end
@@ -154,16 +152,14 @@ module GAlbumTools
     # @param json_file [String] Path to the JSON file
     # @return [Hash] Parsed JSON data
     def read_json(json_file)
-      begin
-        json_content = File.read(json_file)
-        JSON.parse(json_content)
-      rescue JSON::ParserError => e
-        log(:error, "Failed to parse JSON file #{json_file}: #{e.message}")
-        {}
-      rescue => e
-        log(:error, "Failed to read JSON file #{json_file}: #{e.message}")
-        {}
-      end
+      json_content = File.read(json_file)
+      JSON.parse(json_content)
+    rescue JSON::ParserError => e
+      log(:error, "Failed to parse JSON file #{json_file}: #{e.message}")
+      {}
+    rescue => e
+      log(:error, "Failed to read JSON file #{json_file}: #{e.message}")
+      {}
     end
 
     # Load offset times from CSV file

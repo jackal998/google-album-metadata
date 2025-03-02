@@ -39,14 +39,14 @@ A command-line tool for processing metadata from Google Photos Takeout files and
 ### Process metadata from Google Photos Takeout
 
 ```
-bin/g_album_tool process SOURCE_DIR DESTINATION_DIR
+bin/g_album_tool process SOURCE_DIR DEST_DIR
 ```
 
 This command will:
 1. Scan for media files in SOURCE_DIR
 2. Find corresponding JSON metadata files
 3. Apply the metadata to the media files
-4. Save the processed files to DESTINATION_DIR
+4. Save the processed files to DEST_DIR
 5. Generate CSV output files with processing results
 
 ### Analyze errors in CSV output files
@@ -62,20 +62,20 @@ This command will:
 ### Fix errors in processed files
 
 ```
-bin/g_album_tool fix-errors SOURCE_DIR DESTINATION_DIR
+bin/g_album_tool fix-errors DEST_DIR
 ```
 
 This command will:
-1. Find all CSV output files in SOURCE_DIR
+1. Find all CSV output files in DEST_DIR
 2. Identify files with errors
 3. Apply appropriate fixes based on error type
-4. Save fixed files to DESTINATION_DIR
+4. Update the files in place and mark them as processed in the CSV
 
 ### Options
 
 - `-v, --verbose`: Show detailed output
 - `-n, --nested`: Process nested directories
-- `-f, --force`: Force overwrite existing files
+- `--no-csv`: Disable CSV output file creation
 - `-o, --offset-file FILE`: Specify a CSV file with offset times
 - `--version`: Show version
 - `-h, --help`: Show help message
@@ -96,7 +96,8 @@ See [ERROR_SUMMARY.md](ERROR_SUMMARY.md) for more details on error handling stra
 ```
 google-album-metadata/
 ├── bin/
-│   └── g_album_tool      # Main executable
+│   ├── g_album_tool      # Main executable
+│   └── run_tests         # Test runner script
 ├── lib/
 │   ├── g_album_tools.rb  # Main module file
 │   └── g_album_tools/    # Module components
@@ -106,14 +107,25 @@ google-album-metadata/
 │       ├── error_handler.rb
 │       ├── error_types.rb
 │       ├── file_processor.rb
+│       ├── handlers/     # Error handlers
+│       │   ├── base_handler.rb
+│       │   ├── default_handler.rb
+│       │   ├── extension_handler.rb
+│       │   ├── maker_notes_handler.rb
+│       │   ├── metadata_handler.rb
+│       │   └── truncated_media_handler.rb
 │       ├── metadata_processor.rb
 │       └── version.rb
 ├── tests/                # Test files
-├── local_data/           # Local data files (e.g., offset times)
+│   ├── fixtures/         # Test fixtures
+│   └── test_*.rb         # Test files
+├── ARCHITECTURE.md       # Architecture documentation
 ├── ERROR_SUMMARY.md      # Error handling documentation
 ├── README.md             # This file
 └── spec.md              # Project specifications
 ```
+
+For a detailed explanation of the codebase architecture, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## License
 

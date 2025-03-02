@@ -6,7 +6,7 @@ module GAlbumTools
       attr_reader :row, :error_data
 
       def initialize(options = {})
-        super(options)
+        super
         @row = options[:row]
         @error_data = options[:error_data]
       end

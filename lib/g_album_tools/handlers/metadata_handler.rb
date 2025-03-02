@@ -49,7 +49,7 @@ module GAlbumTools
           dest_file
         ]
 
-        stdout_str, stderr_str, status = execute_command(cmd)
+        _, _, _ = execute_command(cmd)
 
         # For missing metadata, we'll consider it handled
         # even if we couldn't extract much from the file
@@ -157,8 +157,8 @@ module GAlbumTools
               cmd << "-GPSLatitude=#{lat}"
               cmd << "-GPSLongitude=#{lng}"
               cmd << "-GPSAltitude=#{alt}"
-              cmd << "-GPSLatitudeRef=#{lat >= 0 ? 'N' : 'S'}"
-              cmd << "-GPSLongitudeRef=#{lng >= 0 ? 'E' : 'W'}"
+              cmd << "-GPSLatitudeRef=#{(lat >= 0) ? "N" : "S"}"
+              cmd << "-GPSLongitudeRef=#{(lng >= 0) ? "E" : "W"}"
             end
 
             # Add title and description if available
@@ -178,7 +178,7 @@ module GAlbumTools
 
             # Execute command if we have metadata to add
             if cmd.size > 3
-              stdout_str, stderr_str, status = execute_command(cmd)
+              _, _, status = execute_command(cmd)
               log(:info, "Applied metadata from related live photo to: #{dest_file}")
               return status.success?
             end
