@@ -27,7 +27,7 @@ This checklist confirms that the Google Album Metadata Tool is ready for public 
 - [x] `bin/` contains only active executables (`g_album_tool` and `g_album_tool.bat`)
 - [x] `lib/` contains well-organized, modular code
 - [x] `spec/` contains RSpec tests properly organized by type
-- [x] `tests/fixtures/` retained for test fixtures
+- [x] `spec/fixtures/` contains test fixtures needed for tests
 - [x] `local_data/` contains all legacy files
 - [x] Empty `archive/` directory available for future use
 
@@ -55,5 +55,4 @@ This checklist confirms that the Google Album Metadata Tool is ready for public 
 1. Consider creating a Ruby gem for easier installation
 2. Add continuous integration for automated testing
 3. Expand test coverage for edge cases
-4. Move test fixtures to a more standard location (`spec/fixtures`)
-5. Add more examples of common workflows in documentation 
+4. Add more examples of common workflows in documentation

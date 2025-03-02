@@ -28,7 +28,7 @@ The following files have been moved to the `local_data` directory to keep them f
 
 The following files/directories have been retained in the main directory structure as they are required for the RSpec tests to run:
 
-- `tests/fixtures/` - Test fixtures directory used by both RSpec tests and setup scripts
+- `spec/fixtures/` - Test fixtures directory used by RSpec tests
   - This directory contains setup scripts for creating test files and directories
 
 ## RSpec Test Structure
@@ -50,7 +50,7 @@ A key aspect of the migration was fixing path references in the tests. The main 
 let(:test_source_dir) { File.join(root_dir, 'tests/fixtures/source') }
 
 # New approach (works correctly)
-let(:test_source_dir) { File.join(Dir.pwd, 'tests/fixtures/source') }
+let(:test_source_dir) { File.join(Dir.pwd, 'spec/fixtures/source') }
 ```
 
 ## Running Tests

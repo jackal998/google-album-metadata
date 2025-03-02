@@ -2,19 +2,19 @@ require 'spec_helper'
 
 RSpec.describe "Metadata Processing Workflow", type: :feature do
   let(:root_dir) { File.expand_path('../..', __FILE__) }
-  let(:test_source_dir) { File.join(Dir.pwd, 'tests/fixtures/source') }
-  let(:test_dest_dir) { File.join(Dir.pwd, 'tests/fixtures/destination') }
-  let(:csv_dir) { File.join(Dir.pwd, 'tests/fixtures/csv') }
+  let(:test_source_dir) { File.join(Dir.pwd, 'spec/fixtures/source') }
+  let(:test_dest_dir) { File.join(Dir.pwd, 'spec/fixtures/destination') }
+  let(:csv_dir) { File.join(Dir.pwd, 'spec/fixtures/csv') }
 
   before(:all) do
     # Make sure test fixtures exist
-    require_relative '../../tests/fixtures/setup_fixtures'
+    require_relative '../fixtures/setup_fixtures'
     TestFixtures.setup_all
   end
 
   after(:all) do
     # Clean up output CSV files (but keep the test fixtures)
-    Dir.glob(File.join(Dir.pwd, 'tests/fixtures/source', "*_output.csv")).each do |file|
+    Dir.glob(File.join(Dir.pwd, 'spec/fixtures/source', "*_output.csv")).each do |file|
       File.delete(file) if File.exist?(file)
     end
   end

@@ -169,9 +169,13 @@ google-album-metadata/
 ├── spec/                # RSpec test files
 │   ├── features/        # Feature tests
 │   ├── lib/             # Unit tests
+│   ├── fixtures/        # Test fixtures
+│   │   └── setup_fixtures.rb # Test fixture setup
 │   └── spec_helper.rb   # Test helper
-├── tests/               # Test fixtures
-│   └── fixtures/        # Test fixtures used by tests
+├── local_data/          # Legacy files
+│   ├── bin/             # Legacy executables
+│   ├── tests/           # Legacy test files
+│   └── g_album_tool.rb  # Legacy main file
 ├── ARCHITECTURE.md      # Architecture documentation
 ├── ERROR_SUMMARY.md     # Error handling documentation
 ├── README.md            # This file

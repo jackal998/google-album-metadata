@@ -41,7 +41,7 @@ end
 
 # Helper method to setup test fixtures
 def setup_test_fixtures
-  require_relative '../tests/fixtures/setup_fixtures'
+  require_relative './fixtures/setup_fixtures'
   TestFixtures.setup_all
 rescue LoadError => e
   puts "Warning: Could not load test fixtures: #{e.message}"

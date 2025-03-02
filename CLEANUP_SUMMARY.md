@@ -19,8 +19,10 @@
 1. **Active Directories**
    - `lib/`: Contains the main code for the project
    - `bin/`: Contains active executables (`g_album_tool` and `g_album_tool.bat`)
-   - `spec/`: Contains all RSpec tests
-   - `tests/fixtures/`: Contains fixtures used by RSpec tests
+   - `spec/`: Contains all RSpec tests organized in subdirectories.
+     - `spec/lib/`: Unit tests for individual classes.
+     - `spec/features/`: Integration/feature tests for the application.
+     - `spec/fixtures/`: Contains fixtures used by RSpec tests.
 
 2. **Legacy Directories**
    - `local_data/`: Contains all legacy files that are no longer actively used

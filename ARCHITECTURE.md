@@ -31,10 +31,9 @@ google-album-metadata/
 │   ├── features/              # Feature/integration tests
 │   ├── lib/                   # Unit tests
 │   │   └── g_album_tools/     # Test for specific components
-│   ├── fixtures/              # Test-specific fixtures
+│   ├── fixtures/              # Test fixtures
+│   │   └── setup_fixtures.rb  # Script to create test fixtures
 │   └── spec_helper.rb         # RSpec configuration
-├── tests/
-│   └── fixtures/              # Test fixtures shared between tests
 ├── local_data/                # Legacy files (not used in current version)
 │   ├── bin/                   # Legacy executables
 │   ├── tests/                 # Legacy test files

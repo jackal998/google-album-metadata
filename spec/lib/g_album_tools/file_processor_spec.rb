@@ -2,8 +2,8 @@ require 'spec_helper'
 
 RSpec.describe GAlbumTools::FileProcessor do
   let(:root_dir) { File.expand_path('../../..', __FILE__) }
-  let(:test_source_dir) { File.join(Dir.pwd, 'tests/fixtures/source') }
-  let(:test_dest_dir) { File.join(Dir.pwd, 'tests/fixtures/destination') }
+  let(:test_source_dir) { File.join(Dir.pwd, 'spec/fixtures/source') }
+  let(:test_dest_dir) { File.join(Dir.pwd, 'spec/fixtures/destination') }
   let(:options) do
     {
       source_directory: test_source_dir,
@@ -15,7 +15,7 @@ RSpec.describe GAlbumTools::FileProcessor do
 
   before(:each) do
     # Ensure test directories exist and fixtures are created
-    require_relative '../../../tests/fixtures/setup_fixtures'
+    require_relative '../../../spec/fixtures/setup_fixtures'
     TestFixtures.setup_directories
     TestFixtures.setup_media_files
     TestFixtures.setup_json_files
