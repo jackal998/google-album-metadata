@@ -14,18 +14,17 @@ The Google Album Metadata Tool (GAlbumTool) is designed to process media files f
       - Supported video formats: mp4, mov, avi, mkv
       - If not a supported format, skip and make a note in the output file
    2. Check if corresponding metadata JSON file exists
-      - Look in the `.metadata` subdirectory
       - Match filename patterns, including special handling for live photos
       - If no metadata found, mark for later error handling
    3. Read and parse the JSON metadata file
    4. Check if offset time information is available (from media file itself)
       - If not available, default to UTC+08:00
    5. Update metadata:
-      - Copy file to destination directory
-      - Update filename if needed
-      - Update EXIF metadata (title, description, etc.)
-      - Update geolocation metadata if available
-      - Update timestamp and offset time information
+      - Copy file to destination directory (can be done through exiftool command)
+      - Update EXIF metadata (consider update all of them within single command)
+        - geolocation metadata if available
+        - timestamp and offset time information
+      - Support error handling for each step
    6. Create CSV output file with processing results
 
 ### 2.2 Error Handling
@@ -34,9 +33,10 @@ The Google Album Metadata Tool (GAlbumTool) is designed to process media files f
 1. **Missing Metadata** (59.84% of errors)
    - **Pattern**: "No JSON file found" or "No metadata found"
    - **Handling Strategy**: 
+     - Check if file is a live photo
+       - If yes, update metadata with metadata from the related photo's metadata, and mark as processed
+       - If no, update metadata with limited metadata (from file attributes like creation date), and mark as not processed
      - Copy files to destination
-     - Extract basic metadata from file attributes (creation date, modification date)
-     - Mark as processed with limited metadata
 
 2. **Maker Notes Errors** (17.93% of errors)
    - **Pattern**: "Error: [minor] Maker notes could not be parsed"
@@ -44,6 +44,7 @@ The Google Album Metadata Tool (GAlbumTool) is designed to process media files f
      - Use ExifTool with "-m" flag to ignore minor errors
      - Remove maker notes metadata
      - Process the rest of the metadata
+     - Mark as successfully processed
 
 3. **Incorrect File Extensions** (21.64% of errors)
    - **Patterns**:
@@ -52,19 +53,21 @@ The Google Album Metadata Tool (GAlbumTool) is designed to process media files f
      - "Not a valid PNG (looks more like a JPEG)"
    - **Handling Strategy**:
      - Use ExifTool to rename files with the correct extension
-     - Reprocess with correct extension
+     - Continue processing with the corrected file
+     - Mark as successfully processed only if no additional errors occur
 
 4. **Truncated Media** (0.58% of errors)
    - **Pattern**: "Truncated mdat atom"
    - **Handling Strategy**:
      - Log as corrupted file
-     - Mark as handled but note corruption status
+     - No fix attempted as these are usually corrupted beyond repair
+     - Mark as not processed, requiring manual intervention
 
 5. **Other Errors**
    - **Handling Strategy**:
      - Generic fallback handling
      - Copy file to destination if possible
-     - Mark as processed for tracking
+     - Mark as not processed for manual review
 
 ## 3. Application Structure
 
@@ -80,7 +83,12 @@ The Google Album Metadata Tool (GAlbumTool) is designed to process media files f
 
 3. **Error Handlers**
    - `BaseHandler`: Common handler functionality
-   - Specialized handlers for each error type
+   - Specialized handlers for each error type:
+     - `MetadataHandler`: For missing metadata, with special handling for live photos
+     - `MakerNotesHandler`: For maker notes errors
+     - `ExtensionHandler`: For incorrect file extensions
+     - `TruncatedMediaHandler`: For corrupted media files
+     - `DefaultHandler`: For other uncategorized errors
 
 ### 3.2 Command Line Interface
 1. **Commands**
@@ -102,6 +110,13 @@ The Google Album Metadata Tool (GAlbumTool) is designed to process media files f
    - Input: Google Photos Takeout structure with media files and .metadata/ JSON files
    - Output: Organized files with updated metadata and CSV report files
 
-3. **Performance Considerations**
+3. **Processing Flow**
+   - Initial processing (process command): 
+     - Process all files, noting errors in CSV files
+   - Error fixing (fix-errors command):
+     - Apply specialized handlers based on error types
+     - Update CSV files with results of fix attempts
+
+4. **Performance Considerations**
    - Process directories in sequence to minimize memory usage
    - Log failures for later batch processing

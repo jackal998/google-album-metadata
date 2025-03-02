@@ -13,9 +13,10 @@ After analyzing 31 CSV files containing processing results for 13,778 files, we 
   - IMG_2063(1)-040.MOV
   - IMG_2063-064.MOV
 - **Handling Strategy**: 
+  - Check if file is a live photo
+    - if yes, update metadata with metadata from the related photo's metadata, and mark as processed
+    - if no, update metadata with limited metadata, and mark as not processed
   - Copy files to destination
-  - Extract basic metadata from file attributes (creation date, modification date)
-  - Mark as processed with limited metadata
 
 ### 2. Maker Notes Errors (17.93% of errors)
 - **Pattern**: "Error: [minor] Maker notes could not be parsed"
@@ -39,8 +40,8 @@ After analyzing 31 CSV files containing processing results for 13,778 files, we 
   - IMG_0989.DNG
   - IMG_2401.PNG
 - **Handling Strategy**:
-  - Use ExifTool to rename files with the correct extension
-  - Update the output CSV to mark as processed
+  - Use ExifTool to rename files with the correct extension and continue processing
+  - Mark as successfully processed if no error occurs
 
 ### 4. Truncated Media (0.58% of errors)
 - **Pattern**: "Truncated mdat atom"
@@ -51,32 +52,4 @@ After analyzing 31 CSV files containing processing results for 13,778 files, we 
 - **Handling Strategy**:
   - Log as corrupted file
   - No fix attempted as these are usually corrupted beyond repair
-  - Mark as handled for tracking purposes
-
-## Implementation
-
-The error handling system has been implemented with:
-
-1. An `ErrorTypes` module to categorize errors based on patterns
-2. A base `BaseHandler` class with common functionality
-3. Specialized handlers for each error type:
-   - `ExtensionHandler` for incorrect file extensions
-   - `MetadataHandler` for missing metadata
-   - `MakerNotesHandler` for maker notes errors
-   - `TruncatedMediaHandler` for truncated media
-   - `DefaultHandler` for other errors
-
-## Usage
-
-To fix errors in processed files:
-
-```bash
-bin/g_album_tool fix-errors DESTINATION_DIR
-```
-
-This command will:
-1. Scan all output CSV files in the specified directory
-2. Identify failed entries
-3. Categorize each error
-4. Apply the appropriate handler
-5. Update the CSV files with the results 
+  - Mark as not processed, need to be fixed manually
