@@ -1,103 +1,191 @@
 require "optparse"
 require_relative "version"
+require_relative "file_processor"
 require_relative "metadata_processor"
 require_relative "error_handler"
 
 module GAlbumTools
   class CLI
-    def initialize(args = ARGV)
-      @args = args
+    attr_reader :options, :parser
+
+    def initialize
       @options = {
         verbose: false,
-        create_output_csv: true
+        nested: false,
+        force: false
       }
-      parse_options
     end
 
+    # Parse command line arguments
+    # @param args [Array<String>] Command line arguments
+    # @return [Hash] Parsed options
+    def parse(args)
+      @parser = OptionParser.new do |opts|
+        opts.banner = "Usage: g_album_tool [options] COMMAND [args]"
+        opts.separator ""
+
+        opts.separator "Commands:"
+        opts.separator "  process SOURCE_DIR DESTINATION_DIR  Process files from SOURCE_DIR and save to DESTINATION_DIR"
+        opts.separator "  analyze CSV_DIR                     Analyze error CSV files in CSV_DIR"
+        opts.separator "  fix-errors SOURCE_DIR DESTINATION_DIR Fix files with errors"
+        opts.separator ""
+
+        opts.separator "Options:"
+        opts.on("-v", "--verbose", "Run verbosely") do
+          @options[:verbose] = true
+        end
+
+        opts.on("-n", "--nested", "Process nested directories") do
+          @options[:nested] = true
+        end
+
+        opts.on("-f", "--force", "Force overwrite existing files") do
+          @options[:force] = true
+        end
+
+        opts.on("-o", "--offset-file FILE", "CSV file with offset times") do |file|
+          @options[:offset_file] = file
+        end
+
+        opts.on("--version", "Show version") do
+          puts "Google Album Metadata Tool v#{VERSION}"
+          exit
+        end
+
+        opts.on_tail("-h", "--help", "Show this message") do
+          puts opts
+          exit
+        end
+      end
+
+      @parser.parse!(args)
+      @command = args.shift
+      @command_args = args
+
+      validate_args
+
+      @options
+    end
+
+    # Run the command with the parsed options
     def run
       case @command
       when "process"
-        process_metadata
+        process_command
+      when "analyze"
+        analyze_command
       when "fix-errors"
-        fix_errors
-      when "help"
-        puts @parser
+        fix_errors_command
       else
-        puts "Unknown command: #{@command}"
         puts @parser
+        exit 1
       end
     end
 
     private
 
-    def parse_options
-      @parser = OptionParser.new do |opts|
-        opts.banner = "Usage: g_album_tool [options] COMMAND"
-        opts.separator ""
-        opts.separator "Commands:"
-        opts.separator "  process SOURCE_DIR DEST_DIR   Process metadata from SOURCE_DIR to DEST_DIR"
-        opts.separator "  fix-errors DEST_DIR          Fix errors in processed files in DEST_DIR"
-        opts.separator "  help                         Show this help message"
-        opts.separator ""
-        opts.separator "Options:"
-
-        opts.on("-v", "--verbose", "Run verbosely") do
-          @options[:verbose] = true
-        end
-
-        opts.on("--no-csv", "Don't create CSV output files") do
-          @options[:create_output_csv] = false
-        end
-
-        opts.on("--nested", "Process nested directories for fix-errors command") do
-          @options[:nested] = true
-        end
-
-        opts.on("-h", "--help", "Show this help message") do
-          puts opts
-          exit
-        end
-
-        opts.on("--version", "Show version") do
-          puts "GAlbumTool version #{GAlbumTools::VERSION}"
-          exit
-        end
-      end
-
-      @parser.parse!(@args)
-
-      @command = @args.shift
-      @command = "help" if @command.nil?
-
+    # Validate command line arguments
+    def validate_args
       case @command
       when "process"
-        @options[:source_directory] = @args.shift
-        @options[:destination_directory] = @args.shift
-
-        if @options[:source_directory].nil? || @options[:destination_directory].nil?
-          puts "Error: Source and destination directories are required for the process command"
+        if @command_args.size != 2
+          puts "Error: 'process' command requires SOURCE_DIR and DESTINATION_DIR"
+          puts @parser
+          exit 1
+        end
+      when "analyze"
+        if @command_args.size != 1
+          puts "Error: 'analyze' command requires CSV_DIR"
           puts @parser
           exit 1
         end
       when "fix-errors"
-        @options[:destination_directory] = @args.shift
-
-        if @options[:destination_directory].nil?
-          puts "Error: Destination directory is required for the fix-errors command"
+        if @command_args.size != 2
+          puts "Error: 'fix-errors' command requires SOURCE_DIR and DESTINATION_DIR"
           puts @parser
           exit 1
         end
+      when nil
+        puts "Error: No command specified"
+        puts @parser
+        exit 1
+      else
+        puts "Error: Unknown command '#{@command}'"
+        puts @parser
+        exit 1
       end
     end
 
-    def process_metadata
-      processor = MetadataProcessor.new(@options)
+    # Process command implementation
+    def process_command
+      source_dir = @command_args[0]
+      destination_dir = @command_args[1]
+
+      processor = MetadataProcessor.new(
+        source_directory: source_dir,
+        destination_directory: destination_dir,
+        nested: @options[:nested],
+        verbose: @options[:verbose],
+        force: @options[:force],
+        offset_file: @options[:offset_file]
+      )
+
       processor.process
     end
 
-    def fix_errors
-      handler = ErrorHandler.new(@options)
-      handler.process
+    # Analyze command implementation
+    def analyze_command
+      csv_dir = @command_args[0]
+
+      # Find all CSV files in the specified directory
+      csv_files = Dir.glob(File.join(csv_dir, "**", "*_output.csv"))
+
+      if csv_files.empty?
+        puts "No CSV files found in #{csv_dir}"
+        exit 1
+      end
+
+      error_handler = ErrorHandler.new(verbose: @options[:verbose])
+      errors = error_handler.load_errors_from_csv(csv_files)
+
+      if errors.empty?
+        puts "No errors found in CSV files"
+        exit 0
+      end
+
+      stats = error_handler.error_stats(errors)
+
+      puts "Error Analysis Summary:"
+      puts "  Total files analyzed: #{stats[:total]}"
+      puts "  No JSON errors: #{stats[:no_json]}"
+      puts "  Unknown pattern errors: #{stats[:unknown_pattern]}"
+      puts "  Live photo missing part errors: #{stats[:live_photo_missing_part]}"
+      puts "  Invalid or truncated errors: #{stats[:invalid_or_truncated]}"
+      puts "  Unknown errors: #{stats[:unknown]}"
+    end
+
+    # Fix errors command implementation
+    def fix_errors_command
+      source_dir = @command_args[0]
+      destination_dir = @command_args[1]
+
+      # Find all CSV files in the source directory
+      csv_files = Dir.glob(File.join(source_dir, "**", "*_output.csv"))
+
+      if csv_files.empty?
+        puts "No CSV files found in #{source_dir}"
+        exit 1
+      end
+
+      error_handler = ErrorHandler.new(verbose: @options[:verbose])
+      errors = error_handler.load_errors_from_csv(csv_files)
+
+      if errors.empty?
+        puts "No errors found in CSV files"
+        exit 0
+      end
+
+      error_handler.fix_errors(destination_dir)
     end
   end
 end

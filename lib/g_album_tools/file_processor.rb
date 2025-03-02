@@ -1,112 +1,204 @@
-require_relative "base"
-require_relative "constants"
+require_relative 'base'
+require 'json'
+require 'fileutils'
 
 module GAlbumTools
   class FileProcessor < Base
-    include Constants
-
-    attr_reader :source_directory, :destination_directory, :processed_files, :create_output_csv
+    attr_reader :source_directory, :destination_directory, :processed_files, :offset_time
 
     def initialize(options = {})
       super(options)
       @source_directory = options[:source_directory]
       @destination_directory = options[:destination_directory]
+      @nested = options[:nested] || false
+      @force = options[:force] || false
+      @offset_file = options[:offset_file]
       @processed_files = {}
-      @create_output_csv = options[:create_output_csv] || false
-      @offset_time = nil
+      @offset_time = []
+
+      load_offset_times if @offset_file
     end
 
+    # Process files in the source directory
     def process
-      return log(:error, "Source directory does not exist: #{source_directory}") unless Dir.exist?(source_directory)
-
-      log(:info, "Processing files in directory: #{source_directory}", at_console: true)
-
-      FileUtils.mkdir_p(destination_directory) unless Dir.exist?(destination_directory)
-
-      load_offset_times
-
-      source_directories = Dir.glob(File.join(source_directory, "**/"))
-      source_directories.each do |dir|
-        check_files(dir)
-        next log(:info, "#{dir} No valid media found.") if processed_files[dir].empty?
-
-        current_destination_directory = dir.gsub(source_directory, destination_directory)
-        FileUtils.mkdir_p(current_destination_directory) unless Dir.exist?(current_destination_directory)
-
-        process_directory(dir, current_destination_directory)
+      unless File.directory?(@source_directory)
+        raise "Source directory does not exist: #{@source_directory}"
       end
 
-      create_csv_output if create_output_csv
+      # Create destination directory if it doesn't exist
+      FileUtils.mkdir_p(@destination_directory) unless File.directory?(@destination_directory)
+
+      log(:info, "Processing files from #{@source_directory} to #{@destination_directory}")
+
+      dirs = @nested ? Dir.glob(File.join(@source_directory, "**", "*")).select { |f| File.directory?(f) } : [@source_directory]
+
+      dirs.each do |dir|
+        process_directory(dir)
+      end
+
+      create_csv_output
+
+      log(:info, "Processing complete")
     end
 
-    private
+    # Get path to corresponding metadata file for a media file
+    # @param file_path [String] Path to the media file
+    # @return [String, nil] Path to the metadata file or nil if not found
+    def metadata_file_path(file_path)
+      # Google Photos uses .json files with the same base name for metadata
+      base_name = File.basename(file_path, ".*")
+      dir_name = File.dirname(file_path)
 
-    def magic_file_path(file_path, live_photo: false)
-      magic_path = File.join(
-        File.dirname(file_path),
-        ".metadata",
-        "#{File.basename(file_path, ".*")}#{live_photo ? ".lp" : ""}.json"
-      )
+      # Try to find a matching JSON file
+      json_file = find_json_file(dir_name, base_name)
 
-      magic_path
+      if json_file.nil?
+        log(:warn, "No JSON file found for #{file_path}")
+        return nil
+      end
+
+      json_file
     end
 
+    # Check if files should be processed
+    # @param dir [String] Directory containing the files
+    # @return [Hash] Hash with directory as key and array of file info as value
     def check_files(dir)
-      media_files = Dir.glob(File.join(dir, "*.{#{SUPPORTED_EXTENSIONS.join(",")}}")).select { |f| File.file?(f) }
-      json_files = Dir.glob(File.join(dir, ".metadata", "*.json"))
+      log(:info, "Checking files in #{dir}")
 
-      processed_files[dir] = []
+      @processed_files[dir] = []
 
-      media_files.each do |file_path|
-        json_path = fetch_json_file(file_path, json_files)
+      # Find all media files in the directory
+      media_files = Dir.glob(File.join(dir, "*"))
+        .select { |f| File.file?(f) }
+        .select do |f|
+          ext = File.extname(f).downcase
+          IMAGE_EXTENSIONS.include?(ext) || VIDEO_EXTENSIONS.include?(ext)
+        end
 
-        if json_path
-          processed_files[dir] << {
-            media_file: file_path,
-            json_file: json_path,
-            data: read_json(json_path)
-          }
-        else
-          log(:warn, "No metadata found for file: #{file_path}")
+      media_files.each do |file|
+        begin
+          ext = File.extname(file).downcase
+          # Skip files that don't match allowed formats
+          unless is_allowed_file_format?(file)
+            log(:debug, "Skipping file with unsupported format: #{file}")
+            next
+          end
+
+          is_live = live_photo?(file)
+          json_file = metadata_file_path(file)
+
+          if json_file
+            data = read_json(json_file)
+            @processed_files[dir] << { media_file: file, json_file: json_file, data: data, is_live_photo: is_live }
+          else
+            # Add without JSON data, will be handled as an error case
+            @processed_files[dir] << { media_file: file, json_file: nil, data: {}, is_live_photo: is_live }
+          end
+        rescue => e
+          log(:error, "Error processing file #{file}: #{e.message}")
         end
       end
+
+      log(:info, "Found #{@processed_files[dir].size} files to process in #{dir}")
+      @processed_files
     end
 
-    def fetch_json_file(file_path, json_files)
-      match_file_path = magic_file_path(file_path, live_photo: live_photo?(file_path))
-      json_files.find { |path| path == match_file_path }
-    end
+    # Find corresponding JSON file for a media file
+    # @param dir_name [String] Directory containing the files
+    # @param base_name [String] Base name of the media file
+    # @return [String, nil] Path to the JSON file or nil if not found
+    def find_json_file(dir_name, base_name)
+      # Try exact match first
+      json_path = File.join(dir_name, "#{base_name}.json")
+      return json_path if File.exist?(json_path)
 
-    def live_photo?(file_path)
-      return false unless LIVE_PHOTO_EXTENSIONS.include?(File.extname(file_path).downcase.delete("."))
-
-      live_photo_base = File.basename(file_path, ".*")
-      matching_image = Dir.glob(File.join(File.dirname(file_path), "#{live_photo_base}.{#{IMAGE_EXTENSIONS.join(",")}}"))
-
-      !matching_image.empty?
-    end
-
-    def read_json(json_path)
-      JSON.parse(File.read(json_path), encoding: "UTF-8")
-    end
-
-    def load_offset_times
-      @offset_time = CSV.read(OFFSET_TIMES_PATH, headers: true, encoding: "bom|utf-16le:utf-8").filter_map do |row|
-        row.to_h.transform_keys(&:to_s)
+      # Google sometimes adds a (1), (2), etc. to the filename, but the JSON keeps the original name
+      # Try with different patterns
+      ALLOWED_FILENAME_SUFFIXES.each do |suffix|
+        base_without_suffix = base_name.gsub(/#{Regexp.escape(suffix)}$/, '')
+        json_path = File.join(dir_name, "#{base_without_suffix}.json")
+        return json_path if File.exist?(json_path)
       end
-    rescue Errno::ENOENT
-      log(:warn, "No offset times file found at #{OFFSET_TIMES_PATH}")
-      @offset_time = []
+
+      nil
     end
 
-    def process_directory(dir, current_destination_directory)
-      # This method should be implemented in child classes
-      raise NotImplementedError, "Subclass must implement process_directory method"
+    # Check if the file is part of a live photo
+    # @param file_path [String] Path to the file
+    # @return [Boolean] True if the file is part of a live photo
+    def live_photo?(file_path)
+      base_name = File.basename(file_path, ".*")
+      dir_name = File.dirname(file_path)
+      ext = File.extname(file_path).downcase
+
+      # Live photos typically have paired image/video files with the same base name
+      if IMAGE_EXTENSIONS.include?(ext)
+        # If this is an image, check for a video with the same base name
+        VIDEO_EXTENSIONS.each do |video_ext|
+          video_path = File.join(dir_name, "#{base_name}#{video_ext}")
+          return true if File.exist?(video_path)
+        end
+      elsif VIDEO_EXTENSIONS.include?(ext)
+        # If this is a video, check for an image with the same base name
+        IMAGE_EXTENSIONS.each do |image_ext|
+          image_path = File.join(dir_name, "#{base_name}#{image_ext}")
+          return true if File.exist?(image_path)
+        end
+      end
+
+      false
     end
 
+    # Read and parse JSON file
+    # @param json_file [String] Path to the JSON file
+    # @return [Hash] Parsed JSON data
+    def read_json(json_file)
+      begin
+        json_content = File.read(json_file)
+        JSON.parse(json_content)
+      rescue JSON::ParserError => e
+        log(:error, "Failed to parse JSON file #{json_file}: #{e.message}")
+        {}
+      rescue => e
+        log(:error, "Failed to read JSON file #{json_file}: #{e.message}")
+        {}
+      end
+    end
+
+    # Load offset times from CSV file
+    def load_offset_times
+      return unless @offset_file && File.exist?(@offset_file)
+
+      begin
+        CSV.foreach(@offset_file, headers: true) do |row|
+          @offset_time << row.to_h
+        end
+        log(:info, "Loaded #{@offset_time.size} offset time entries")
+      rescue => e
+        log(:error, "Failed to load offset times from #{@offset_file}: #{e.message}")
+      end
+    end
+
+    # Check if the file format is allowed
+    # @param file_path [String] Path to the file
+    # @return [Boolean] True if the file format is allowed
+    def is_allowed_file_format?(file_path)
+      ext = File.extname(file_path).downcase
+      IMAGE_EXTENSIONS.include?(ext) || VIDEO_EXTENSIONS.include?(ext)
+    end
+
+    # Process a directory
+    # This is a placeholder method to be overridden by subclasses
+    # @param dir [String] Directory to process
+    def process_directory(dir)
+      check_files(dir)
+    end
+
+    # Create CSV output
+    # This is a placeholder method to be overridden by subclasses
     def create_csv_output
-      # This method should be implemented in child classes
-      raise NotImplementedError, "Subclass must implement create_csv_output method"
+      log(:info, "CSV output generation is handled by subclasses")
     end
   end
 end

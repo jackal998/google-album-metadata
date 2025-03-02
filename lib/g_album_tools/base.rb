@@ -4,9 +4,12 @@ require "fileutils"
 require "open3"
 require "csv"
 require "rchardet"
+require_relative "constants"
 
 module GAlbumTools
   class Base
+    include Constants
+
     SHOW_COMMAND = false
     LOG_FILE = "metadata_editor.log"
 
@@ -18,6 +21,10 @@ module GAlbumTools
       @logger.level = options[:log_level] || Logger::INFO
     end
 
+    # Logs a message at the specified level and optionally to the console
+    # @param level [Symbol] The log level (:info, :debug, :warn, :error, :fatal)
+    # @param message [String] The message to log
+    # @param at_console [Boolean] Whether to also output to the console
     def log(level, message, at_console: @verbose)
       case level
       when :info, :debug, :warn, :error, :fatal
@@ -29,6 +36,10 @@ module GAlbumTools
       end
     end
 
+    # Executes a shell command with error handling
+    # @param cmd [Array<String>] The command and its arguments
+    # @param log_result [Boolean] Whether to log the command output
+    # @return [Array] stdout, stderr, status of the command
     def execute_command(cmd, log_result: true)
       log(:info, "Executing: #{cmd.join(" ")}") if SHOW_COMMAND
 
@@ -42,6 +53,9 @@ module GAlbumTools
       [stdout_str, stderr_str, status]
     end
 
+    # Cleans a string by handling encoding issues
+    # @param str [String] The string to clean
+    # @return [String, nil] The cleaned string, or nil if input was nil/empty
     def clean_string(str)
       return nil if str.nil? || str.empty?
 

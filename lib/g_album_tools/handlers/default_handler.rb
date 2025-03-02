@@ -15,7 +15,7 @@ module GAlbumTools
           return false
         end
 
-        # For generic errors, we'll try a generic approach
+        # For generic errors, we'll try a basic approach
         dest_dir = File.dirname(row["Destination File"] || row["Media File"])
         file_name = File.basename(row["Media File"])
         dest_file = File.join(dest_dir, file_name)
@@ -34,8 +34,26 @@ module GAlbumTools
           end
         end
 
-        # For generic errors, we'll just mark it as handled
-        # and copy the file without processing
+        # Try some basic metadata extraction
+        cmd = [
+          "exiftool",
+          "-m", # Ignore minor errors
+          "-overwrite_original",
+          "-FileModifyDate>DateTimeOriginal",
+          "-FileCreateDate>CreateDate",
+          dest_file
+        ]
+
+        stdout_str, stderr_str, status = execute_command(cmd)
+
+        if status.success?
+          log(:info, "Applied basic metadata to: #{dest_file}")
+        else
+          log(:warn, "Failed to apply basic metadata, but file was copied: #{stderr_str}")
+        end
+
+        # For generic errors, we mark it as handled as long as we
+        # were able to copy the file
         true
       end
     end

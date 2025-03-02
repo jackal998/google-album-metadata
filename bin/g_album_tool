@@ -1,5 +1,13 @@
 #!/usr/bin/env ruby
 
-require_relative "../lib/g_album_tools/cli"
+require_relative '../lib/g_album_tools'
 
-GAlbumTools::CLI.new.run 
+begin
+  cli = GAlbumTools::CLI.new
+  cli.parse(ARGV)
+  cli.run
+rescue => e
+  puts "Error: #{e.message}"
+  puts e.backtrace if ENV['DEBUG']
+  exit 1
+end
