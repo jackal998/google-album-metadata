@@ -1,6 +1,7 @@
 require_relative "base"
 require "json"
 require "fileutils"
+require "pry"
 
 module GAlbumTools
   class FileProcessor < Base
@@ -30,7 +31,18 @@ module GAlbumTools
 
       log(:info, "Processing files from #{@source_directory} to #{@destination_directory}")
 
-      dirs = @nested ? Dir.glob(File.join(@source_directory, "**", "*")).select { |f| File.directory?(f) } : [@source_directory]
+      # Handle Windows with non-ASCII characters in paths differently
+      if @nested
+        if is_windows? && contains_non_ascii?(@source_directory)
+          # Use manual directory traversal on Windows with non-ASCII paths
+          dirs = find_all_directories(@source_directory)
+        else
+          # Use regular globbing for Unix or ASCII-only Windows paths
+          dirs = Dir.glob(File.join(@source_directory, "**", "*")).select { |f| File.directory?(f) }
+        end
+      else
+        dirs = [@source_directory]
+      end
 
       dirs.each do |dir|
         process_directory(dir)
@@ -69,15 +81,22 @@ module GAlbumTools
       @processed_files[dir] = []
 
       # Find all media files in the directory
-      media_files = Dir.glob(File.join(dir, "*"))
-        .select { |f| File.file?(f) }
-        .select do |f|
+      media_files = if is_windows? && contains_non_ascii?(dir)
+        # For Windows with non-ASCII paths, use alternative file listing method
+        find_files_in_directory(dir).select do |f|
           ext = File.extname(f).downcase
           IMAGE_EXTENSIONS.include?(ext) || VIDEO_EXTENSIONS.include?(ext)
         end
+      else
+        Dir.glob(File.join(dir, "*"))
+          .select { |f| File.file?(f) }
+          .select do |f|
+            ext = File.extname(f).downcase
+            IMAGE_EXTENSIONS.include?(ext) || VIDEO_EXTENSIONS.include?(ext)
+          end
+      end
 
       media_files.each do |file|
-        File.extname(file).downcase
         # Skip files that don't match allowed formats
         unless is_allowed_file_format?(file)
           log(:debug, "Skipping file with unsupported format: #{file}")
@@ -108,6 +127,7 @@ module GAlbumTools
     # @return [String, nil] Path to the JSON file or nil if not found
     def find_json_file(dir_name, base_name)
       # Try exact match first
+      binding.pry
       json_path = File.join(dir_name, "#{base_name}.json")
       return json_path if File.exist?(json_path)
 
@@ -195,6 +215,57 @@ module GAlbumTools
     # This is a placeholder method to be overridden by subclasses
     def create_csv_output
       log(:info, "CSV output generation is handled by subclasses")
+    end
+
+    # Helper method to check if running on Windows
+    # @return [Boolean] True if running on Windows
+    def is_windows?
+      RUBY_PLATFORM =~ /mswin|mingw|cygwin/
+    end
+
+    # Helper to check if a path contains non-ASCII characters
+    # @param path [String] Path to check
+    # @return [Boolean] True if the path contains non-ASCII characters
+    def contains_non_ascii?(path)
+      path.encode("UTF-8").chars.any? { |c| c.ord > 127 }
+    end
+
+    # Find all files in a directory manually (for Windows with non-ASCII paths)
+    # @param dir [String] Directory to search
+    # @return [Array<String>] List of file paths
+    def find_files_in_directory(dir)
+      # Use Ruby's Dir.entries instead of Dir.glob for non-ASCII Windows paths
+      Dir.entries(dir)
+         .reject { |f| f == '.' || f == '..' }
+         .map { |f| File.join(dir, f) }
+         .select { |f| File.file?(f) }
+    rescue => e
+      log(:error, "Error finding files in directory #{dir}: #{e.message}")
+      []
+    end
+
+    # Find all directories under a root directory (for Windows with non-ASCII paths)
+    # @param root_dir [String] Root directory to search
+    # @return [Array<String>] List of directory paths including the root
+    def find_all_directories(root_dir)
+      result = [root_dir]
+      
+      # Get first level entries
+      entries = Dir.entries(root_dir).reject { |f| f == '.' || f == '..' }
+      
+      # Process subdirectories
+      entries.each do |entry|
+        path = File.join(root_dir, entry)
+        if File.directory?(path)
+          # Recursively find subdirectories
+          result.concat(find_all_directories(path))
+        end
+      end
+      
+      result
+    rescue => e
+      log(:error, "Error finding directories under #{root_dir}: #{e.message}")
+      [root_dir] # Return at least the root directory
     end
   end
 end

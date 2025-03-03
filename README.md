@@ -47,54 +47,74 @@ bin/g_album_tool info
 
 ## Installation
 
-1. Clone this repository:
-   ```
-   git clone https://github.com/yourusername/google-album-metadata.git
+### macOS
+
+```bash
+# Install dependencies
+brew install exiftool
+gem install bundler
+
+# Clone the repository
+git clone https://github.com/yourusername/google-album-metadata.git
+cd google-album-metadata
+
+# Install Ruby dependencies
+bundle install
+```
+
+### Windows
+
+1. **Install Ruby**:
+   - Download and install Ruby from [RubyInstaller](https://rubyinstaller.org/)
+   - Make sure to check the option to add Ruby to your PATH during installation
+
+2. **Install ExifTool**:
+   - Download ExifTool from [https://exiftool.org/](https://exiftool.org/)
+   - Extract the archive and rename `exiftool(-k).exe` to `exiftool.exe`
+   - Move `exiftool.exe` to a directory in your PATH (or add its location to your PATH)
+
+3. **Setup the Application**:
+   ```cmd
+   # Install bundler
+   gem install bundler
+
+   # Clone or download the repository
+   # Navigate to the project directory
    cd google-album-metadata
+
+   # Install dependencies
+   bundle install
    ```
 
-2. Install dependencies:
-   ```
-   gem install bundler  # If bundler is not installed
-   bundle install       # Install dependencies from Gemfile
-   ```
-
-3. Install ExifTool:
-   - Mac: `brew install exiftool`
-   - Linux: `apt install libimage-exiftool-perl` or equivalent
-   - Windows:
-     - Download Ruby installer from [RubyInstaller](https://rubyinstaller.org/) (version 2.6 or later)
-     - During installation, check "Add Ruby executables to your PATH"
-     - Download ExifTool from [ExifTool website](https://exiftool.org/)
-     - **Important**: Rename `exiftool(-k).exe` to `exiftool.exe`
-     - Add the directory containing ExifTool to your PATH or place it in a directory that's already in your PATH
-     - Open Command Prompt and navigate to the project directory
-     - Run `gem install bundler` and then `bundle install`
-     - Run `bin\g_album_tool.bat info` to verify installation
-
-4. Ensure the `bin/g_album_tool` script is executable:
-   - Unix/macOS: `chmod +x bin/g_album_tool`
-   - Windows: Use `ruby bin/g_album_tool` to run the script
+4. **Special Notes for Windows Users**:
+   - For best results with Unicode file paths (non-English characters), run from PowerShell
+   - If you encounter issues with file paths containing special characters, try moving files to paths with only ASCII characters
 
 ## Usage
 
 ### Process metadata from Google Photos Takeout
 
-```
-bin/g_album_tool process SOURCE_DIR DEST_DIR
+```bash
+# macOS/Linux
+bin/g_album_tool process SOURCE_DIR DESTINATION_DIR
+
+# Windows (PowerShell recommended)
+bin\g_album_tool.bat process SOURCE_DIR DESTINATION_DIR
 ```
 
 This command will:
-1. Scan for media files in SOURCE_DIR
-2. Find corresponding JSON metadata files
-3. Apply the metadata to the media files
-4. Save the processed files to DEST_DIR
-5. Generate CSV output files with processing results
+1. Scan SOURCE_DIR for media files and their corresponding JSON metadata
+2. Process each file, fixing common issues
+3. Copy processed files to DESTINATION_DIR with correct metadata
 
 ### Analyze errors in CSV output files
 
-```
+```bash
+# macOS/Linux
 bin/g_album_tool analyze CSV_DIR
+
+# Windows
+bin\g_album_tool.bat analyze CSV_DIR
 ```
 
 This command will:
@@ -103,20 +123,28 @@ This command will:
 
 ### Fix errors in processed files
 
-```
-bin/g_album_tool fix-errors DEST_DIR
+```bash
+# macOS/Linux
+bin/g_album_tool fix-errors DESTINATION_DIR
+
+# Windows
+bin\g_album_tool.bat fix-errors DESTINATION_DIR
 ```
 
 This command will:
-1. Find all CSV output files in DEST_DIR
+1. Find all CSV output files in DESTINATION_DIR
 2. Identify files with errors
 3. Apply appropriate fixes based on error type
 4. Update the files in place and mark them as processed in the CSV
 
 ### Display system information
 
-```
+```bash
+# macOS/Linux
 bin/g_album_tool info
+
+# Windows
+bin\g_album_tool.bat info
 ```
 
 This command will:
@@ -264,11 +292,24 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ### Windows-Specific Issues
 
-1. **Command Prompt encoding issues**
-   - If you see garbled characters in filenames, try running `chcp 65001` before running the tool
-   - For PowerShell, you may need to set `$OutputEncoding = [System.Text.Encoding]::UTF8`
-   - The batch file `g_album_tool.bat` already sets UTF-8 encoding, but manual adjustment may be needed
+1. **Unicode Path Issues**: 
+   - If you encounter problems with folders containing non-ASCII characters:
+   - Try using PowerShell instead of CMD
+   - Move files to a path with only ASCII characters
+   - Use shorter path names (avoid deeply nested directories)
 
-2. **Path too long errors**
-   - Windows has path length limitations that could cause issues with deeply nested directories
-   - Try using a shorter destination path if you encounter such errors
+2. **ExifTool Not Found**:
+   - Ensure ExifTool is properly installed and in your PATH
+   - Check that the file is named `exiftool.exe` (not `exiftool(-k).exe`)
+
+3. **Permission Issues**:
+   - Run as administrator if you encounter permission errors
+   - Check Windows Defender or antivirus software is not blocking file operations
+
+For more detailed troubleshooting, run:
+
+```
+bin\g_album_tool.bat info
+```
+
+This will show system information and dependency status to help diagnose issues.

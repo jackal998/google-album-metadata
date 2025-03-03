@@ -18,9 +18,10 @@ module GAlbumTools
     MAC = RbConfig::CONFIG["host_os"] =~ /darwin/
     LINUX = RbConfig::CONFIG["host_os"] =~ /linux/
 
-    attr_reader :logger, :verbose
+    attr_reader :logger, :verbose, :options
 
     def initialize(options = {})
+      @options = options
       @verbose = options[:verbose] || false
       @logger = Logger.new(options[:log_file] || LOG_FILE)
       @logger.level = options[:log_level] || Logger::INFO
@@ -113,10 +114,13 @@ module GAlbumTools
     # Checks if ExifTool is installed and available
     # @return [Boolean] true if ExifTool is available
     def exiftool_available?
-      _, _, status = execute_command(["exiftool", "-ver"], log_result: false)
-      status.success?
-    rescue
-      false
+      # On Windows, we need to check both exiftool and exiftool.exe
+      if is_windows?
+        system("where exiftool > nul 2>&1") || system("where exiftool.exe > nul 2>&1")
+      else
+        # On Unix systems
+        system("which exiftool > /dev/null 2>&1")
+      end
     end
 
     # Gets system information for troubleshooting
@@ -126,9 +130,9 @@ module GAlbumTools
         ruby_version: RUBY_VERSION,
         ruby_platform: RUBY_PLATFORM,
         operating_system: RbConfig::CONFIG["host_os"],
-        is_windows: WINDOWS,
-        is_mac: MAC,
-        is_linux: LINUX,
+        is_windows: is_windows?,
+        is_mac: is_mac?,
+        is_linux: is_linux?,
         exiftool_available: exiftool_available?,
         exiftool_version: exiftool_version
       }
@@ -137,10 +141,49 @@ module GAlbumTools
     # Gets ExifTool version
     # @return [String, nil] ExifTool version or nil if not available
     def exiftool_version
-      stdout, _, status = execute_command(["exiftool", "-ver"], log_result: false)
-      status.success? ? stdout.strip : nil
+      if is_windows?
+        # On Windows, redirect error output to NUL
+        `exiftool -ver 2> nul`.strip
+      else
+        # On Unix systems
+        `exiftool -ver 2>/dev/null`.strip
+      end
     rescue
       nil
+    end
+
+    # Check if running on Windows
+    # @return [Boolean] True if running on Windows
+    def is_windows?
+      RUBY_PLATFORM =~ /mswin|mingw|cygwin/ || RbConfig::CONFIG['host_os'] =~ /mswin|mingw|cygwin/
+    end
+
+    # Check if running on macOS
+    # @return [Boolean] True if running on macOS
+    def is_mac?
+      RUBY_PLATFORM =~ /darwin/ || RbConfig::CONFIG['host_os'] =~ /darwin/
+    end
+
+    # Check if running on Linux
+    # @return [Boolean] True if running on Linux
+    def is_linux?
+      RUBY_PLATFORM =~ /linux/ || RbConfig::CONFIG['host_os'] =~ /linux/
+    end
+
+    # Utility method to check path encoding and fix if necessary
+    # @param path [String] Path to check and possibly fix
+    # @return [String] Fixed path
+    def fix_path_encoding(path)
+      # Only attempt to fix on Windows with non-ASCII characters
+      if is_windows? && path.encode("UTF-8").chars.any? { |c| c.ord > 127 }
+        # Ensure consistent UTF-8 encoding for Windows paths with non-ASCII characters
+        path.encode("UTF-8")
+      else
+        path
+      end
+    rescue
+      # If encoding conversion fails, return original path
+      path
     end
   end
 end
