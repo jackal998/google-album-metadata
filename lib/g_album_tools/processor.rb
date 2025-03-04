@@ -1,11 +1,12 @@
 require "fileutils"
+require_relative "error_manager"
 
 module GAlbumTools
   class Processor
     LOG_FILE = "metadata_editor.log".freeze
 
     attr_reader :verbose, :source_directory, :destination_directory, :create_output_csv, 
-                :processed_files, :logger, :exiftool, :file_detector, :metadata_processor, :error_handler
+                :processed_files, :logger, :exiftool, :file_detector, :metadata_processor, :error_manager
 
     def initialize(verbose, source_directory, destination_directory, create_output_csv)
       @verbose = verbose
@@ -18,7 +19,7 @@ module GAlbumTools
       @exiftool = ExifToolWrapper.new(@logger, false)
       @file_detector = FileDetector.new(@logger, @exiftool)
       @metadata_processor = MetadataProcessor.new(@logger, @exiftool)
-      @error_handler = ErrorHandler.new(@logger, @exiftool)
+      @error_manager = ErrorManager.new(@logger, @exiftool)
       
       @create_output_csv = create_output_csv
     end
@@ -67,13 +68,13 @@ module GAlbumTools
         else
           output_file&.write_error(file, info[:json_file], result[:errors])
           # Handle errors based on error type
-          error_result = error_handler.handle_error(file, result[:errors], destination_directory)
+          error_result = error_manager.handle_error(file, result[:errors], destination_directory)
           logger.info("Error handled: #{error_result[:message]}")
         end
       else
         output_file&.write_missing_json(file)
         # Handle missing metadata case
-        error_result = error_handler.handle_error(file, "No JSON file found", destination_directory)
+        error_result = error_manager.handle_error(file, "No JSON file found", destination_directory)
         logger.info("Missing metadata handled: #{error_result[:message]}")
       end
     end
