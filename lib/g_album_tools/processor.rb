@@ -47,37 +47,31 @@ module GAlbumTools
       current_destination_directory = dir.gsub(source_directory, destination_directory)
       FileUtils.mkdir_p(current_destination_directory) unless Dir.exist?(current_destination_directory)
 
-      output_csv = create_output_csv_file(current_destination_directory) if create_output_csv
+      output_file = create_output_csv ? OutputFile.new(current_destination_directory, logger) : nil
 
       processed_files[dir].each do |file, info|
-        process_file(file, info, current_destination_directory, output_csv)
+        process_file(file, info, current_destination_directory, output_file)
       end
 
-      output_csv.close if create_output_csv
+      output_file&.close
     end
 
-    def create_output_csv_file(directory)
-      output_file = File.new(File.join(File.dirname(directory), "#{File.basename(directory)}_output.csv"), "w")
-      output_file.puts("Processed,Media File,JSON File,Messages,Errors")
-      output_file
-    end
-
-    def process_file(file, info, destination_directory, output_csv)
+    def process_file(file, info, destination_directory, output_file)
       if info[:json_file]
         json_data = metadata_processor.read_json(info[:json_file])
         result = metadata_processor.update_metadata(file, json_data, destination_directory)
 
         if result[:success]
           info[:processed] = true 
-          output_csv.puts("true,#{file},#{info[:json_file]},#{result[:messages]},") if create_output_csv
+          output_file&.write_success(file, info[:json_file], result[:messages])
         else
-          output_csv.puts("false,#{file},#{info[:json_file]},,#{result[:errors]}") if create_output_csv
+          output_file&.write_error(file, info[:json_file], result[:errors])
           # Handle errors based on error type
           error_result = error_handler.handle_error(file, result[:errors], destination_directory)
           logger.info("Error handled: #{error_result[:message]}")
         end
       else
-        output_csv.puts("false,#{file},,,No JSON file found.") if create_output_csv
+        output_file&.write_missing_json(file)
         # Handle missing metadata case
         error_result = error_handler.handle_error(file, "No JSON file found", destination_directory)
         logger.info("Missing metadata handled: #{error_result[:message]}")

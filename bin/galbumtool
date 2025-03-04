@@ -7,15 +7,19 @@ require_relative "../lib/g_album_tools"
 
 options = {}
 parser = OptionParser.new do |op|
-  op.banner = "Usage: galbumtool -o <source_directory> -d <destination_directory> [options]"
+  op.banner = "Usage: galbumtool -s <source_directory> -d <destination_directory> [options]"
   
-  op.on("--version", "Show version") { options[:version] = _1 }
-  op.on("--verbose", "Show verbose logs") { options[:verbose] = _1 }
+  op.on("--version", "Show version") { options[:version] = true }
+  op.on("--verbose", "Show verbose logs") { options[:verbose] = true }
 
   op.on("-s SOURCE", "--source SOURCE", "Set source path") { options[:source] = _1 }
   op.on("-d DEST", "--destination DEST", "Set destination path") { options[:destination] = _1 }
 
-  op.on("--output", "Output the result to a file") { options[:output] = _1 }
+  op.on("--output", "Output the result to a file") { options[:output] = true }
+  
+  # New options for error handling
+  op.on("--process-errors", "Process error files from a previous run") { options[:process_errors] = true }
+  op.on("--nested", "Process subdirectories when handling errors") { options[:nested] = true }
 end
 
 begin
@@ -28,7 +32,20 @@ end
 
 if options[:version]
   puts GAlbumTools::VERSION
+elsif options[:process_errors] && options[:destination]
+  # Initialize the core components needed
+  logger = GAlbumTools::Logger.new(GAlbumTools::Processor::LOG_FILE, options[:verbose])
+  exiftool = GAlbumTools::ExifToolWrapper.new(logger, false)
+  
+  # Process error files
+  GAlbumTools::ErrorFilesWorker.new(
+    options[:destination],
+    logger,
+    exiftool,
+    options[:nested]
+  ).process
 elsif options[:source] && options[:destination]
+  # Normal processing
   GAlbumTools::Processor.new(
     options[:verbose],
     options[:source],
