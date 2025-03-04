@@ -1,4 +1,4 @@
-require "pry"
+require "open3"
 
 module GAlbumTools
   class ExtensionUpdater
@@ -8,8 +8,6 @@ module GAlbumTools
     end
 
     def call
-      binding.pry
-      
       cmd = [
         "exiftool",
         "-ext",

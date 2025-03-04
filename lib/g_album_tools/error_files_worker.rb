@@ -1,4 +1,4 @@
-require "pry"
+require "csv"
 
 module GAlbumTools
   class ErrorFilesWorker
