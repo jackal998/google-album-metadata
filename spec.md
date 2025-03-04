@@ -72,51 +72,9 @@ The Google Album Metadata Tool (GAlbumTool) is designed to process media files f
 ## 3. Application Structure
 
 ### 3.1 Core Components
-1. **Base Classes**
-   - `Base`: Common logging, command execution, and string handling
-   - `FileProcessor`: File discovery and organization
-   - `MetadataProcessor`: Metadata extraction and application
 
-2. **Error Handling**
-   - `ErrorTypes`: Error categorization and pattern matching
-   - `ErrorHandler`: Orchestrates error handling flow
-
-3. **Error Handlers**
-   - `BaseHandler`: Common handler functionality
-   - Specialized handlers for each error type:
-     - `MetadataHandler`: For missing metadata, with special handling for live photos
-     - `MakerNotesHandler`: For maker notes errors
-     - `ExtensionHandler`: For incorrect file extensions
-     - `TruncatedMediaHandler`: For corrupted media files
-     - `DefaultHandler`: For other uncategorized errors
+TBC
 
 ### 3.2 Command Line Interface
-1. **Commands**
-   - `process SOURCE_DIR DEST_DIR`: Process metadata from source to destination
-   - `fix-errors DEST_DIR`: Fix errors in already processed files
 
-2. **Options**
-   - `-v, --verbose`: Enable verbose output
-   - `--no-csv`: Disable CSV output file creation
-   - `--nested`: Process nested directories for fix-errors command
-
-## 4. Implementation Notes
-
-1. **Dependencies**
-   - Ruby 2.6+
-   - ExifTool (external command-line tool)
-
-2. **File Organization**
-   - Input: Google Photos Takeout structure with media files and .metadata/ JSON files
-   - Output: Organized files with updated metadata and CSV report files
-
-3. **Processing Flow**
-   - Initial processing (process command): 
-     - Process all files, noting errors in CSV files
-   - Error fixing (fix-errors command):
-     - Apply specialized handlers based on error types
-     - Update CSV files with results of fix attempts
-
-4. **Performance Considerations**
-   - Process directories in sequence to minimize memory usage
-   - Log failures for later batch processing
+TBC
