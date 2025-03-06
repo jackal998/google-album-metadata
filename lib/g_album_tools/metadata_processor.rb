@@ -3,16 +3,11 @@ require "csv"
 
 module GAlbumTools
   class MetadataProcessor
-    OFFSET_TIMES_KEYS = %w[OffsetTime OffsetTimeOriginal OffsetTimeDigitized]
-    OFFSET_TIMES_PATH = "./local_data/offset_times.csv".freeze
-
-    attr_reader :logger, :exiftool, :offset_time
+    attr_reader :logger, :exiftool
 
     def initialize(logger, exiftool)
       @logger = logger
       @exiftool = exiftool
-      @offset_time = {}
-      load_offset_times
     end
 
     def read_json(json_path)
@@ -29,7 +24,8 @@ module GAlbumTools
 
       # Add timestamp data
       if data.dig("photoTakenTime", "timestamp")
-        taken_time = Time.at(data.dig("photoTakenTime", "timestamp").to_i, in: offset_time[file_path]).strftime("%Y:%m:%d %H:%M:%S")
+        offset_time = exiftool.get_offset_time(file_path)
+        taken_time = Time.at(data.dig("photoTakenTime", "timestamp").to_i, in: offset_time).strftime("%Y:%m:%d %H:%M:%S")
         exif_args << "-DateTimeOriginal='#{taken_time}'"
         exif_args << "-FileCreateDate='#{taken_time}'"
       end
@@ -57,21 +53,6 @@ module GAlbumTools
 
       destination_path = File.join(destination_directory, File.basename(file_path))
       exiftool.update_metadata(file_path, exif_args, destination_path)
-    end
-
-    private
-
-    def load_offset_times
-      @offset_time = CSV.read(OFFSET_TIMES_PATH, headers: true, encoding: "bom|utf-16le:utf-8").filter_map do |row|
-        offset_time_values = row.values_at(*OFFSET_TIMES_KEYS)
-        next if offset_time_values.all? { _1 == "-" }
-        next logger.info("Invalid offset time data in #{row}") if offset_time_values.uniq.size > 1
-
-        [row["SourceFile"], offset_time_values.first]
-      end.to_h
-    rescue => e
-      logger.error("Failed to load offset times: #{e.message}")
-      {}
     end
   end
 end 

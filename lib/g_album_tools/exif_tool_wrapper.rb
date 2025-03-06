@@ -3,11 +3,14 @@ require "rchardet"
 
 module GAlbumTools
   class ExifToolWrapper
+    DEFAULT_OFFSET_TIME = "+08:00"
+
     attr_reader :logger, :show_command
 
     def initialize(logger, show_command = false)
       @logger = logger
       @show_command = show_command
+      @offset_time_cache = {}
     end
 
     def execute_command(cmd, log_result: true)
@@ -33,6 +36,27 @@ module GAlbumTools
     rescue NoMethodError => e
       logger.error("Failed to get duration for #{file_path}, #{stdout_str}, #{e.message}")
       nil
+    end
+
+    def get_offset_time(file_path)
+      # Return cached value if available
+      return @offset_time_cache[file_path] if @offset_time_cache.key?(file_path)
+      @offset_time_cache[file_path] = DEFAULT_OFFSET_TIME
+
+      # Extract OffsetTime, OffsetTimeOriginal, and OffsetTimeDigitized
+      cmd = ["exiftool", "-fast", "-ee", "-OffsetTimeOriginal", "-OffsetTimeDigitized", "-OffsetTime", file_path]
+      stdout_str, _, status = execute_command(cmd, log_result: false)
+      
+      if status.success? && stdout_str
+        offset_times = stdout_str.split("\n").filter_map do |line|
+          line.match(/Offset Time \w* *: (.+0)$/)[1]
+        end
+        @offset_time_cache[file_path] = offset_times.first
+      end
+    rescue => e
+      logger.error("Failed to get offset time for #{file_path}: #{e.message}")
+    ensure
+      @offset_time_cache[file_path]
     end
 
     def update_file_extension(file_path, current_extension, expected_extension)
