@@ -30,7 +30,7 @@ module GAlbumTools
       logger.info("Processing errors in directory: #{dir}")
       
       # Read the output file for this directory
-      rows = OutputFile.read_output_file(dir, logger)
+      rows = OutputFile.new(dir, logger).read_output_file
       return logger.info("No output file found for #{dir}") if rows.empty?
       
       # Process each row with errors

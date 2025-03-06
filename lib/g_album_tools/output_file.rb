@@ -2,12 +2,12 @@ require "csv"
 
 module GAlbumTools
   class OutputFile
-    attr_reader :file, :logger
+    attr_reader :file, :file_path, :logger
 
     def initialize(directory, logger)
       @logger = logger
       @file_path = build_file_path(directory)
-      @file = File.new(@file_path, "w")
+      @file = File.new(file_path, "w")
       write_header
     end
 
@@ -32,10 +32,9 @@ module GAlbumTools
       file.close
     end
 
-    def self.read_output_file(dir, logger = nil)
-      file_path = build_file_path(dir)
+    def read_output_file
       unless File.exist?(file_path)
-        logger&.info("No output file found for #{dir}")
+        logger&.info("No output file found for #{file_path}")
         return []
       end
 
@@ -47,7 +46,7 @@ module GAlbumTools
       rows
     end
 
-    def self.build_file_path(dir)
+    def build_file_path(dir)
       File.join(File.dirname(dir), "#{File.basename(dir)}_output.csv")
     end
   end
