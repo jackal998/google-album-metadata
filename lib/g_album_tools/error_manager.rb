@@ -1,8 +1,8 @@
-require_relative "missing_metadata"
-require_relative "maker_notes"
-require_relative "incorrect_extension"
-require_relative "truncated_media"
-require_relative "unknown"
+require_relative "error_handlers/missing_metadata"
+require_relative "error_handlers/maker_notes"
+require_relative "error_handlers/incorrect_extension"
+require_relative "error_handlers/truncated_media"
+require_relative "error_handlers/unknown"
 
 module GAlbumTools
   class ErrorManager
@@ -13,39 +13,40 @@ module GAlbumTools
       truncated_media: /Truncated mdat atom/
     }.freeze
 
-    attr_reader :logger, :exiftool
+    attr_reader :logger, :exiftool, :metadata_processor
 
-    def initialize(logger, exiftool)
+    def initialize(logger, exiftool, metadata_processor)
       @logger = logger
       @exiftool = exiftool
+      @metadata_processor = metadata_processor
     end
 
-    def handle_error(file_path, error_message, destination_directory)
-      result = handler(error_type(error_message))
-        .new(logger, exiftool)
-        .handle(file_path, error_message, destination_directory)
+    def handle_error(error_message, file_details)
+      handler = handler(error_type(error_message)).new(logger, exiftool, error_message, file_details, metadata_processor)
+
+      result = handler.handle
 
       if result[:processed]
-        logger.info("Processed #{file_path}")
+        logger.info("Processed #{file_details[:file]}")
       else
-        logger.error("Failed to process #{file_path}: #{result[:message]}")
+        logger.error("Failed to process #{file_details[:file]}: #{result[:message]}")
       end
     end
 
     private
 
-    def handler(error_type, logger, exiftool)
+    def handler(error_type)
       case error_type
       when :missing_metadata
-        MissingMetadata
+        ErrorHandlers::MissingMetadata
       when :maker_notes
-        MakerNotes
+        ErrorHandlers::MakerNotes
       when :incorrect_extension
-        IncorrectExtension
+        ErrorHandlers::IncorrectExtension
       when :truncated_media
-        TruncatedMedia
+        ErrorHandlers::TruncatedMedia
       else
-        Unknown
+        ErrorHandlers::Unknown
       end
     end
 

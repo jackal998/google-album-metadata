@@ -22,7 +22,7 @@ module GAlbumTools
       stderr_str = clean_string(stderr_str)
 
       if log_result
-        status.success? ? logger.info("Success: #{stdout_str} #{cmd[2]}") : logger.error("Failed: #{stderr_str}")
+        status.success? ? logger.info("Success: #{stdout_str} #{cmd[2]}") : logger.error(stderr_str)
       end
 
       [stdout_str, stderr_str, status]

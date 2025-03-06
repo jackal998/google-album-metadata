@@ -15,7 +15,7 @@ module GAlbumTools
       @exiftool = exiftool
     end
 
-    def check_directory(dir)
+    def map_json_files(dir)
       media_files = Dir.glob(File.join(dir, "*.{#{SUPPORTED_EXTENSIONS.join(",")}}")).select { |f| File.file?(f) }
       json_files = Dir.glob(File.join(dir, "*.json")).select { |f| File.file?(f) }
 
@@ -24,7 +24,7 @@ module GAlbumTools
       missing_json = media_files - media_files_from_json
       missing_media = media_files_from_json - media_files
 
-      processed_files = {}
+      mapped_files = {}
 
       media_files.each do |media_file|
         json_file =
@@ -35,14 +35,14 @@ module GAlbumTools
             "#{media_file}.json"
           end
 
-        processed_files[media_file] = {json_file: json_file, processed: false}
+        mapped_files[media_file] = json_file
       end
 
       missing_media.each do |file_path|
         logger.info("Media file is missing for JSON file: #{file_path}")
       end
 
-      processed_files
+      mapped_files
     end
 
     def fetch_json_file(file_path, json_files)

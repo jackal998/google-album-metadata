@@ -6,20 +6,19 @@ module GAlbumTools
     LOG_FILE = "metadata_editor.log".freeze
 
     attr_reader :verbose, :source_directory, :destination_directory, :create_output_csv,
-      :processed_files, :logger, :exiftool, :file_detector, :metadata_processor, :error_manager
+      :logger, :exiftool, :file_detector, :metadata_processor, :error_manager
 
     def initialize(verbose, source_directory, destination_directory, create_output_csv)
       @verbose = verbose
       @source_directory = source_directory
       @destination_directory = destination_directory
-      @processed_files = {}
 
       # Initialize helper classes
       @logger = Logger.new(LOG_FILE, verbose)
       @exiftool = ExifToolWrapper.new(@logger, false)
       @file_detector = FileDetector.new(@logger, @exiftool)
       @metadata_processor = MetadataProcessor.new(@logger, @exiftool)
-      @error_manager = ErrorManager.new(@logger, @exiftool)
+      @error_manager = ErrorManager.new(@logger, @exiftool, @metadata_processor)
 
       @create_output_csv = create_output_csv
     end
@@ -42,36 +41,40 @@ module GAlbumTools
     private
 
     def process_directory(dir)
-      @processed_files[dir] = file_detector.check_directory(dir)
-      return logger.info("#{dir} No valid media found.") if processed_files[dir].empty?
+      files_with_json = file_detector.map_json_files(dir)
+      return logger.info("#{dir} No valid media found.") if files_with_json.empty?
 
-      current_destination_directory = dir.gsub(source_directory, destination_directory)
-      FileUtils.mkdir_p(current_destination_directory) unless Dir.exist?(current_destination_directory)
+      target_directory = dir.gsub(source_directory, destination_directory)
+      FileUtils.mkdir_p(target_directory) unless Dir.exist?(target_directory)
 
-      output_file = create_output_csv ? OutputFile.new(current_destination_directory, logger) : nil
+      output_file = create_output_csv ? OutputFile.new(target_directory, logger) : nil
 
-      processed_files[dir].each do |file, info|
-        process_file(file, info, current_destination_directory, output_file)
+      files_with_json.each do |file, json_file|
+        process_file(file, json_file, target_directory, output_file)
       end
 
       output_file&.close
     end
 
-    def process_file(file, info, destination_directory, output_file)
-      if info[:json_file]
-        json_data = metadata_processor.read_json(info[:json_file])
-        result = metadata_processor.update_metadata(file, json_data, destination_directory)
+    def process_file(file, json_file, target_directory, output_file)
+      json_data = json_file ? metadata_processor.read_json(json_file) : nil
 
-        if result[:success]
-          info[:processed] = true
-          output_file&.write_success(file, info[:json_file], result[:messages])
-        else
-          output_file&.write_error(file, info[:json_file], result[:errors])
-          error_manager.handle_error(file, result[:errors], destination_directory)
-        end
+      file_details = {
+        file: file,
+        json_data: json_data,
+        json_file: json_file,
+        target_directory: target_directory
+      }
+
+      if json_data
+        result = metadata_processor.update_metadata(**file_details)
+        return output_file&.write_success(file, json_file, result[:messages]) if result[:success]
+
+        output_file&.write_error(file, json_file, result[:errors])
+        error_manager.handle_error(result[:errors], file_details)
       else
         output_file&.write_missing_json(file)
-        error_manager.handle_error(file, "No JSON file found", destination_directory)
+        error_manager.handle_error("No JSON file found", file_details)
       end
     end
   end

@@ -9,7 +9,6 @@ require_relative "g_album_tools/exif_tool_wrapper"
 require_relative "g_album_tools/file_detector"
 require_relative "g_album_tools/metadata_processor"
 require_relative "g_album_tools/error_manager"
-require_relative "g_album_tools/error_handler"
 
 module GAlbumTools
   class Error < StandardError; end

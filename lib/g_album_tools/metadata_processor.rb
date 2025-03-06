@@ -17,7 +17,7 @@ module GAlbumTools
       nil
     end
 
-    def update_metadata(file_path, data, destination_directory)
+    def update_metadata(file_path:, data:, destination_directory:)
       return {} if data.nil?
 
       exif_args = []
