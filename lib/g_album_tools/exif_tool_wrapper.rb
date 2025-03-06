@@ -46,7 +46,7 @@ module GAlbumTools
       # Extract OffsetTime, OffsetTimeOriginal, and OffsetTimeDigitized
       cmd = ["exiftool", "-fast", "-ee", "-OffsetTimeOriginal", "-OffsetTimeDigitized", "-OffsetTime", file_path]
       stdout_str, _, status = execute_command(cmd, log_result: false)
-      
+
       if status.success? && stdout_str
         offset_times = stdout_str.split("\n").filter_map do |line|
           line.match(/Offset Time \w* *: (.+0)$/)[1]
@@ -67,7 +67,7 @@ module GAlbumTools
         "-FileName=#{File.basename(file_path, ".*")}.#{expected_extension.downcase}",
         file_path
       ]
-      
+
       execute_command(cmd)
     end
 
@@ -93,4 +93,4 @@ module GAlbumTools
       str.force_encoding(encoding).encode("UTF-8").strip
     end
   end
-end 
+end

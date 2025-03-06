@@ -1,4 +1,4 @@
-require "logger" 
+require "logger"
 
 module GAlbumTools
   class Logger
@@ -20,4 +20,4 @@ module GAlbumTools
       puts "ERROR: #{message}" if at_console
     end
   end
-end 
+end

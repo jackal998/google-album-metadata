@@ -19,7 +19,7 @@ module GAlbumTools
 
     def update_metadata(file_path, data, destination_directory)
       return {} if data.nil?
-      
+
       exif_args = []
 
       # Add timestamp data
@@ -55,4 +55,4 @@ module GAlbumTools
       exiftool.update_metadata(file_path, exif_args, destination_path)
     end
   end
-end 
+end

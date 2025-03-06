@@ -6,8 +6,8 @@ module GAlbumTools
       def handle(file_path, error_message, destination_directory)
         copy_file_to_destination(file_path, destination_directory)
 
-        { processed: false, message: "File appears to be corrupted (truncated media)" }
+        {processed: false, message: "File appears to be corrupted (truncated media)"}
       end
     end
   end
-end 
+end

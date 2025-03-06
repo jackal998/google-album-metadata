@@ -63,7 +63,7 @@ module GAlbumTools
 
       duration = exiftool.get_duration(file_path)
       return false if duration.nil?
-      
+
       duration < 3
     end
 
@@ -85,4 +85,4 @@ module GAlbumTools
       magic_path[0...-4]
     end
   end
-end 
+end

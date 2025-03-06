@@ -5,22 +5,22 @@ module GAlbumTools
   class Processor
     LOG_FILE = "metadata_editor.log".freeze
 
-    attr_reader :verbose, :source_directory, :destination_directory, :create_output_csv, 
-                :processed_files, :logger, :exiftool, :file_detector, :metadata_processor, :error_manager
+    attr_reader :verbose, :source_directory, :destination_directory, :create_output_csv,
+      :processed_files, :logger, :exiftool, :file_detector, :metadata_processor, :error_manager
 
     def initialize(verbose, source_directory, destination_directory, create_output_csv)
       @verbose = verbose
       @source_directory = source_directory
       @destination_directory = destination_directory
       @processed_files = {}
-      
+
       # Initialize helper classes
       @logger = Logger.new(LOG_FILE, verbose)
       @exiftool = ExifToolWrapper.new(@logger, false)
       @file_detector = FileDetector.new(@logger, @exiftool)
       @metadata_processor = MetadataProcessor.new(@logger, @exiftool)
       @error_manager = ErrorManager.new(@logger, @exiftool)
-      
+
       @create_output_csv = create_output_csv
     end
 
@@ -63,7 +63,7 @@ module GAlbumTools
         result = metadata_processor.update_metadata(file, json_data, destination_directory)
 
         if result[:success]
-          info[:processed] = true 
+          info[:processed] = true
           output_file&.write_success(file, info[:json_file], result[:messages])
         else
           output_file&.write_error(file, info[:json_file], result[:errors])
@@ -75,4 +75,4 @@ module GAlbumTools
       end
     end
   end
-end 
+end

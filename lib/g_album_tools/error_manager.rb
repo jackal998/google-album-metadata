@@ -51,11 +51,11 @@ module GAlbumTools
 
     def error_type(error_message)
       return :missing_metadata unless error_message
-      
+
       ERROR_TYPES.each do |type, pattern|
         return type if error_message.match?(pattern)
       end
       :unknown
     end
   end
-end 
+end

@@ -14,4 +14,4 @@ require_relative "g_album_tools/error_handler"
 module GAlbumTools
   class Error < StandardError; end
   # Your code goes here...
-end 
+end
