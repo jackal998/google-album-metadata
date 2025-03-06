@@ -4,11 +4,10 @@ require_relative "error_manager"
 
 module GAlbumTools
   class ErrorFilesWorker
-    attr_reader :destination_directory, :nested, :logger, :exiftool, :error_manager
+    attr_reader :destination_directory, :logger, :exiftool, :error_manager
 
-    def initialize(destination_directory, logger, exiftool, nested = false)
+    def initialize(destination_directory, logger, exiftool)
       @destination_directory = destination_directory || "."
-      @nested = nested
       @logger = logger
       @exiftool = exiftool
       @error_manager = ErrorManager.new(logger, exiftool)
@@ -17,18 +16,14 @@ module GAlbumTools
     def process
       logger.info("Processing error files in #{destination_directory}")
       
-      destination_directories.each do |dir|
-        process_directory(dir)
-      end
+      process_directory(destination_directory)
       
       logger.info("Error file processing completed")
     end
 
     private
 
-    def process_directory(dir)
-      logger.info("Processing errors in directory: #{dir}")
-      
+    def process_directory(dir)      
       # Read the output file for this directory
       rows = OutputFile.new(dir, logger).read_output_file
       return logger.info("No output file found for #{dir}") if rows.empty?
@@ -55,14 +50,6 @@ module GAlbumTools
       result = error_manager.handle_error(media_file, error_message, dir)
       
       logger.info("Error handling result: #{result[:message]}")
-    end
-
-    def destination_directories
-      if nested
-        Dir.glob(File.join(destination_directory, "**/"))
-      else
-        [destination_directory]
-      end
     end
   end
 end

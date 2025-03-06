@@ -15,11 +15,13 @@ parser = OptionParser.new do |op|
   op.on("-s SOURCE", "--source SOURCE", "Set source path") { options[:source] = _1 }
   op.on("-d DEST", "--destination DEST", "Set destination path") { options[:destination] = _1 }
 
-  op.on("--output", "Output the result to a file") { options[:output] = true }
+  op.on("-o", "--output", "Output the result to a file") { options[:output] = true }
   
   # New options for error handling
   op.on("--process-errors", "Process error files from a previous run") { options[:process_errors] = true }
-  op.on("--nested", "Process subdirectories when handling errors") { options[:nested] = true }
+
+  # Mark commented out for now as we should make it globally applicable in all features
+  # op.on("--nested", "Process subdirectories when handling errors") { options[:nested] = true }
 end
 
 begin
@@ -41,8 +43,7 @@ elsif options[:process_errors] && options[:destination]
   GAlbumTools::ErrorFilesWorker.new(
     options[:destination],
     logger,
-    exiftool,
-    options[:nested]
+    exiftool
   ).process
 elsif options[:source] && options[:destination]
   # Normal processing
