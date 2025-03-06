@@ -67,15 +67,11 @@ module GAlbumTools
           output_file&.write_success(file, info[:json_file], result[:messages])
         else
           output_file&.write_error(file, info[:json_file], result[:errors])
-          # Handle errors based on error type
-          error_result = error_manager.handle_error(file, result[:errors], destination_directory)
-          logger.info("Error handled: #{error_result[:message]}")
+          error_manager.handle_error(file, result[:errors], destination_directory)
         end
       else
         output_file&.write_missing_json(file)
-        # Handle missing metadata case
-        error_result = error_manager.handle_error(file, "No JSON file found", destination_directory)
-        logger.info("Missing metadata handled: #{error_result[:message]}")
+        error_manager.handle_error(file, "No JSON file found", destination_directory)
       end
     end
   end
