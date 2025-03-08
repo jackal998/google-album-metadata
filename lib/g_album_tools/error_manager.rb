@@ -2,15 +2,22 @@ require_relative "error_handlers/missing_metadata"
 require_relative "error_handlers/maker_notes"
 require_relative "error_handlers/incorrect_extension"
 require_relative "error_handlers/truncated_media"
+require_relative "error_handlers/file_exists"
 require_relative "error_handlers/unknown"
 
 module GAlbumTools
   class ErrorManager
     ERROR_TYPES = {
+      # "No JSON file found."
       missing_metadata: /No JSON file found|No metadata found/,
+      # "Error: [minor] Maker notes could not be parsed - <origin_file_path>"
       maker_notes: /Error: \[minor\] Maker notes could not be parsed/,
+      # "Error: Not a valid <current_extension> (looks more like a <expected_extension>) - <origin_file_path>"
       incorrect_extension: /Not a valid (\w+) \(looks more like a (\w+)\)/,
-      truncated_media: /Truncated mdat atom/
+      # "Error: Truncated mdat atom - <origin_file_path>"
+      truncated_media: /Truncated mdat atom/,
+      # "Error: '<destination_file_path>' already exists - <origin_file_path>"
+      file_exists: /Error: '.*' already exists/
     }.freeze
 
     attr_reader :logger, :exiftool, :metadata_processor
@@ -45,6 +52,8 @@ module GAlbumTools
         ErrorHandlers::IncorrectExtension
       when :truncated_media
         ErrorHandlers::TruncatedMedia
+      when :file_exists
+        ErrorHandlers::FileExists
       else
         ErrorHandlers::Unknown
       end

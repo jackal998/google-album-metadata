@@ -9,14 +9,10 @@ module GAlbumTools
 
         current_extension, expected_extension = match.captures
 
-        # Create a temporary file with correct extension
         origin_dir = File.dirname(file_details[:file])
         file_with_correct_extension = File.join(origin_dir, "#{File.basename(file_details[:file], ".*")}.#{expected_extension.downcase}")
         FileUtils.cp(file_details[:file], file_with_correct_extension)
 
-        # Copy the corrected file to destination
-        # target_path = File.join(file_details[:target_directory], File.basename(file_with_correct_extension))
-        # FileUtils.cp(file_with_correct_extension, target_path)
         result = update_metadata(file_path: file_with_correct_extension)
 
         # Clean up the temporary file (optional, depending on policy)

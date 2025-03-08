@@ -6,7 +6,7 @@ module GAlbumTools
       def handle
         destination_path = File.join(file_details[:target_directory], File.basename(file_details[:file]))
 
-        # Use -m flag to ignore minor errors
+        # Use -m flag to ignore minor errors when processing with exiftool
         cmd = ["exiftool", "-m", "-o", destination_path, file_details[:file]]
         _, stderr_str, status = exiftool.execute_command(cmd)
 
