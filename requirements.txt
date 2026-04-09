@@ -1,0 +1,6 @@
+# Required
+# (all other imports are from the Python standard library)
+
+# Optional — enables local-timezone timestamps derived from GPS coordinates.
+# Without this, timestamps are written in UTC.
+timezonefinder

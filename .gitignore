@@ -59,3 +59,15 @@ build-iPhoneSimulator/
 /local_data/
 *.log
 .vscode/
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+
+# sync_takeout.py output files
+orphans.txt
+failures.txt
