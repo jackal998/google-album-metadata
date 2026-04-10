@@ -1,0 +1,46 @@
+name: Tests
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  # -------------------------------------------------------------------------
+  # Python — unit tests + E2E tests
+  # -------------------------------------------------------------------------
+  python:
+    name: Python tests
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install system dependencies (exiftool)
+        run: sudo apt-get update -qq && sudo apt-get install -y libimage-exiftool-perl
+
+      - name: Install Python dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Verify exiftool installation
+        run: exiftool -ver
+
+      # Unit tests — fast, no exiftool needed
+      - name: Run unit tests
+        run: pytest tests/unit/ -v --tb=short
+
+      # E2E tests — require exiftool and real fixture files
+      - name: Run E2E tests
+        run: pytest tests/e2e/ -v --tb=short -m e2e

@@ -1,0 +1,14 @@
+# This file contains list of files where setting right exif date failed
+# You might find it useful, but you can safely delete this :)
+\\LinXiaoYun\home\Photos\Takeout\Google 相簿\測試\510289876210942038.mp4
+\\LinXiaoYun\home\Photos\Takeout\Google 相簿\測試\7B395435-28FB-46D7-8E31-731536AB0309 Copy.mov
+\\LinXiaoYun\home\Photos\Takeout\Google 相簿\測試\IMG_0006.PNG
+\\LinXiaoYun\home\Photos\Takeout\Google 相簿\測試\IMG_0193.HEIC
+\\LinXiaoYun\home\Photos\Takeout\Google 相簿\測試\IMG_1048.MOV
+\\LinXiaoYun\home\Photos\Takeout\Google 相簿\測試\IMG_3804.PNG
+\\LinXiaoYun\home\Photos\Takeout\Google 相簿\測試\IMG_3818.HEIC
+\\LinXiaoYun\home\Photos\Takeout\Google 相簿\測試\IMG_4487-ANIMATION.gif
+\\LinXiaoYun\home\Photos\Takeout\Google 相簿\測試\IMG_9556(1).HEIC
+\\LinXiaoYun\home\Photos\Takeout\Google 相簿\測試\IMG_9556.HEIC
+\\LinXiaoYun\home\Photos\Takeout\Google 相簿\測試\MOVIE.mp4
+\\LinXiaoYun\home\Photos\Takeout\Google 相簿\測試\螢幕擷取畫面 2024-07-28 145219.png

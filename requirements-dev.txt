@@ -1,0 +1,6 @@
+# Development / testing dependencies
+pytest
+pytest-cov
+
+# Optional runtime dependency (also tested when installed)
+timezonefinder

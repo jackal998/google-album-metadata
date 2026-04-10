@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "galbum"
+version = "0.1.0"
+description = "Write Google Photos Takeout JSON metadata back into media files"
+requires-python = ">=3.10"
+dependencies = [
+    "timezonefinder",
+]
+
+[project.scripts]
+galbum = "galbum.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["galbum*"]
