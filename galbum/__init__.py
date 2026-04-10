@@ -1,6 +1,5 @@
 from .constants import (
     COMPANION_PHOTO_EXTS,
-    DEFAULT_ROOT,
     DUPE_RE,
     EDITED_SUFFIXES,
     MEDIA_EXTENSIONS,

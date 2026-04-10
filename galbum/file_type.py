@@ -37,8 +37,8 @@ _TYPE_TO_EXT = {
 
 
 def get_file_type(path: Path) -> tuple:
-    """Return (file_type, actual_path) where actual_path may differ if the file
-    has a mismatched extension that needs a temp rename before exiftool."""
+    """Return (file_type, needs_rename) where needs_rename is True if the file
+    has a mismatched extension that requires a temp rename before exiftool."""
     ext = path.suffix.lower()
     ext_type_map = {
         ".jpg": "jpeg", ".jpeg": "jpeg",

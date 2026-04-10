@@ -1,7 +1,5 @@
 import re
-from pathlib import Path
 
-DEFAULT_ROOT = Path("D:/Downloads/Takeout/Google 相簿")
 TEST_FOLDER_NAME = "測試"
 
 MEDIA_EXTENSIONS = {

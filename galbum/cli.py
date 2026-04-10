@@ -4,38 +4,61 @@ import subprocess
 import sys
 from pathlib import Path
 
-from .constants import DEFAULT_ROOT, TEST_FOLDER_NAME
+from .constants import TEST_FOLDER_NAME
 from .exiftool import ExiftoolProcess
 from .metadata_parser import _TZ_FINDER
 from .processor import process_folder
 from .scanner import load_retry_files
 
 
-def parse_args():
+def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        description="Sync Google Takeout JSON metadata back into media files."
+        prog="galbum",
+        description="Write Google Photos Takeout JSON metadata back into media files.",
     )
-    p.add_argument("--root", type=Path, default=DEFAULT_ROOT,
-                   help="Root album folder (default: %(default)s)")
-    p.add_argument("--folder", action="append", dest="folders",
-                   help="Process only this subfolder name (repeatable)")
-    p.add_argument("--test-only", action="store_true",
-                   help=f"Process only the {TEST_FOLDER_NAME!r} folder")
-    p.add_argument("--dry-run", action="store_true",
-                   help="Preview operations without writing")
-    p.add_argument("--force", action="store_true",
-                   help="Re-process files that already have DateTimeOriginal")
-    p.add_argument("--backup", action="store_true",
-                   help="Keep exiftool _original backups (omits -overwrite_original)")
-    p.add_argument("--no-file-dates", action="store_true", dest="no_file_dates",
-                   help="Do NOT update OS file creation/modification dates (default: dates are set)")
-    p.add_argument("--exclude", action="append", dest="excludes", metavar="NAME",
-                   help="Skip this subfolder name (repeatable)")
-    p.add_argument("--retry-failures", action="store_true", dest="retry_failures",
-                   help="Re-process only files listed in failures.txt (targeted retry, no full scan)")
-    p.add_argument("--log", type=Path, default=Path("sync_takeout.log"),
-                   help="Log file path (default: %(default)s)")
-    return p.parse_args()
+    sub = p.add_subparsers(dest="command", metavar="COMMAND")
+    sub.required = True
+
+    # ------------------------------------------------------------------
+    # galbum sync [path]
+    # ------------------------------------------------------------------
+    sync_p = sub.add_parser(
+        "sync",
+        help="Sync Takeout JSON metadata into media files.",
+        description="Write Google Photos Takeout JSON metadata back into media files.",
+    )
+    sync_p.add_argument(
+        "path",
+        nargs="?",
+        type=Path,
+        default=None,
+        help="Root album folder (default: current directory)",
+    )
+    sync_p.add_argument("--folder", action="append", dest="folders",
+                        help="Process only this subfolder name (repeatable)")
+    sync_p.add_argument("--test-only", action="store_true",
+                        help=f"Process only the {TEST_FOLDER_NAME!r} folder")
+    sync_p.add_argument("--dry-run", action="store_true",
+                        help="Preview operations without writing")
+    sync_p.add_argument("--force", action="store_true",
+                        help="Re-process files that already have DateTimeOriginal")
+    sync_p.add_argument("--backup", action="store_true",
+                        help="Keep exiftool _original backups (omits -overwrite_original)")
+    sync_p.add_argument("--no-file-dates", action="store_true", dest="no_file_dates",
+                        help="Do NOT update OS file creation/modification dates "
+                             "(default: dates are set)")
+    sync_p.add_argument("--exclude", action="append", dest="excludes", metavar="NAME",
+                        help="Skip this subfolder name (repeatable)")
+    sync_p.add_argument("--retry-failures", action="store_true", dest="retry_failures",
+                        help="Re-process only files listed in failures.txt "
+                             "(targeted retry, no full scan)")
+    sync_p.add_argument("--log", type=Path, default=Path("galbum.log"),
+                        help="Log file path (default: %(default)s)")
+    return p
+
+
+def parse_args():
+    return _build_parser().parse_args()
 
 
 def setup_logging(log_path: Path):
@@ -80,24 +103,25 @@ def get_album_folders(root: Path, args) -> list:
     return sorted(f for f in root.iterdir() if f.is_dir() and f.name not in excludes)
 
 
-def main():
-    args = parse_args()
+def _cmd_sync(args):
+    root = (args.path or Path.cwd()).resolve()
     setup_logging(args.log)
 
     logging.info("=" * 60)
-    logging.info("sync_takeout starting. root=%s dry_run=%s force=%s",
-                 args.root, args.dry_run, args.force)
+    logging.info("galbum starting. root=%s dry_run=%s force=%s",
+                 root, args.dry_run, args.force)
 
     if not check_exiftool():
         sys.exit(1)
 
-    script_dir = Path(__file__).parent.parent
+    # Output files (orphans.txt / failures.txt) land in the working directory
+    cwd = Path.cwd()
     orphan_list = []
     fail_list = []
 
     with ExiftoolProcess() as et:
         if args.retry_failures:
-            retry_map = load_retry_files(script_dir / "failures.txt")
+            retry_map = load_retry_files(cwd / "failures.txt")
             if not retry_map:
                 logging.info("No retryable files found. Exiting.")
                 return
@@ -107,7 +131,7 @@ def main():
                 process_folder(folder, args, et, logging.getLogger(), orphan_list, fail_list,
                                files_filter=file_set)
         else:
-            folders = get_album_folders(args.root, args)
+            folders = get_album_folders(root, args)
             missing = [f for f in folders if not f.exists()]
             if missing:
                 for f in missing:
@@ -116,15 +140,20 @@ def main():
             for folder in folders:
                 process_folder(folder, args, et, logging.getLogger(), orphan_list, fail_list)
 
-    # Write summary files next to the script
     if orphan_list:
-        orphan_path = script_dir / "orphans.txt"
+        orphan_path = cwd / "orphans.txt"
         orphan_path.write_text("\n".join(orphan_list) + "\n", encoding="utf-8")
         logging.info("Orphan list written to: %s (%d files)", orphan_path, len(orphan_list))
 
     if fail_list:
-        fail_path = script_dir / "failures.txt"
+        fail_path = cwd / "failures.txt"
         fail_path.write_text("\n".join(fail_list) + "\n", encoding="utf-8")
         logging.info("Failure list written to: %s (%d files)", fail_path, len(fail_list))
 
-    logging.info("Done.")
+    logging.info("galbum done.")
+
+
+def main():
+    args = parse_args()
+    if args.command == "sync":
+        _cmd_sync(args)

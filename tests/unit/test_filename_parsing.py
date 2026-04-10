@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from sync_takeout import parse_media_filename
+from galbum import parse_media_filename
 
 
 # ---------------------------------------------------------------------------

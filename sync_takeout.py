@@ -2,14 +2,15 @@
 """
 sync_takeout.py — Compatibility shim. All logic lives in the galbum package.
 
-Usage:
-  python sync_takeout.py --dry-run       # preview operations
-  python sync_takeout.py                 # process all albums
-  python -m galbum                       # preferred invocation via package
+Preferred usage:
+  galbum sync [path]           # installed CLI command
+  python -m galbum sync [path] # module invocation
+
+Legacy usage (still works):
+  python sync_takeout.py sync [path]
 """
-from galbum import (  # noqa: F401  (re-exported for test imports)
+from galbum import (  # noqa: F401  (re-exported for backwards compatibility)
     COMPANION_PHOTO_EXTS,
-    DEFAULT_ROOT,
     DUPE_RE,
     EDITED_SUFFIXES,
     MEDIA_EXTENSIONS,
