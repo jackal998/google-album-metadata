@@ -106,6 +106,57 @@ bin/galbumtool --version
 
 ---
 
+## Development & testing
+
+### Setup
+
+```bash
+pip install -r requirements-dev.txt
+sudo apt-get install libimage-exiftool-perl   # or: brew install exiftool
+```
+
+### Run the tests
+
+```bash
+# Unit tests only (no exiftool needed)
+pytest tests/unit/ -v
+
+# Unit + E2E (exiftool must be on PATH)
+pytest -v
+
+# E2E tests only
+pytest tests/e2e/ -v -m e2e
+```
+
+### Test structure
+
+```
+tests/
+  unit/
+    test_filename_parsing.py   # parse_media_filename()
+    test_json_matching.py      # find_json() — all 5 matching steps
+    test_metadata_parsing.py   # parse_metadata(), is_valid_gps(), _local_datetime()
+    test_exiftool_args.py      # build_exiftool_args() per file type and flag
+    test_file_type.py          # get_file_type(), _magic_type(), mismatch detection
+  e2e/
+    test_e2e.py                # full process_folder() run on real fixture files
+  fixtures/
+    e2e_album/                 # real media files + JSON sidecars with controlled metadata
+```
+
+E2E fixtures cover every matching step: exact match (PNG, WEBP, JPEG), duplicate-number
+reordering, live-photo video orphan, edited-photo fallback, plus orphan handling and
+skip-list files. The fixture JSON sidecars contain deliberately controlled metadata
+(timestamp 2021-01-01, GPS Tokyo) so assertions are unambiguous. Source fixture files
+are never modified — each test run copies them to a fresh temp directory.
+
+### CI
+
+GitHub Actions runs the full test matrix (Python 3.10 / 3.11 / 3.12) on every push
+and pull request, installing exiftool via `apt-get` so E2E tests run in CI too.
+
+---
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
