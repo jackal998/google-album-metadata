@@ -32,3 +32,6 @@ failures.txt
 
 # Local data
 /local_data/
+
+# Claude Code worktree session data
+.claude/
