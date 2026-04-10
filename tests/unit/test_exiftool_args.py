@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from sync_takeout import ParsedMetadata, build_exiftool_args
+from galbum import ParsedMetadata, build_exiftool_args
 
 # ---------------------------------------------------------------------------
 # Shared fixtures

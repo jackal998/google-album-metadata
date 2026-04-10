@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from sync_takeout import is_valid_gps, parse_metadata, _local_datetime
+from galbum import is_valid_gps, parse_metadata, _local_datetime
 
 
 # ---------------------------------------------------------------------------

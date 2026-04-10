@@ -22,7 +22,7 @@ from pathlib import Path
 
 import pytest
 
-from sync_takeout import ExiftoolProcess, process_folder
+from galbum import ExiftoolProcess, process_folder
 
 # ---------------------------------------------------------------------------
 # Shared constants — must match tests/fixtures/e2e_album/*.json

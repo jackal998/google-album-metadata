@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from sync_takeout import (
+from galbum import (
     JsonIndex,
     MatchResult,
     find_json,
@@ -34,7 +34,7 @@ def _make_index(*json_names: str, titles: dict | None = None) -> JsonIndex:
         # strip .json, then strip (N), keep base stem
         without_json = name[: -len(".json")]
         stem = Path(without_json).stem
-        from sync_takeout import DUPE_RE
+        from galbum import DUPE_RE
         m = DUPE_RE.match(stem)
         stem = m.group(1) if m else stem
         all_stems.setdefault(stem, []).append(path)

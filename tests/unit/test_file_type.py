@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from sync_takeout import _magic_type, get_file_type
+from galbum import _magic_type, get_file_type
 
 
 # ---------------------------------------------------------------------------

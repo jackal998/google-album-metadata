@@ -29,21 +29,33 @@ cd google-album-metadata
 pip install -r requirements.txt
 
 # 3. Dry run first — preview what would be written without touching any files
-python -m galbum --root "/path/to/Takeout/Google Photos" --dry-run
+galbum sync "/path/to/Takeout/Google Photos" --dry-run
 
 # 4. Run for real
-python -m galbum --root "/path/to/Takeout/Google Photos"
+galbum sync "/path/to/Takeout/Google Photos"
+
+# 5. Run from inside the album folder (path defaults to current directory)
+cd "/path/to/Takeout/Google Photos"
+galbum sync
 ```
 
-The `--root` flag is required unless you update `DEFAULT_ROOT` in `galbum/constants.py`.
+You can also invoke it as a module without installing:
+
+```bash
+python -m galbum sync "/path/to/Takeout/Google Photos" --dry-run
+```
 
 ---
 
 ## All options
 
-| Flag | Description |
+```
+galbum sync [path] [options]
+```
+
+| Argument / Flag | Description |
 |---|---|
-| `--root PATH` | Root album folder containing per-album subdirectories |
+| `path` | Root album folder containing per-album subdirectories (default: current directory) |
 | `--folder NAME` | Process only this subfolder (repeatable) |
 | `--test-only` | Process only the `測試` test folder |
 | `--dry-run` | Preview what would be written without touching any files |
@@ -52,7 +64,7 @@ The `--root` flag is required unless you update `DEFAULT_ROOT` in `galbum/consta
 | `--no-file-dates` | Do not update OS-level file creation/modification timestamps |
 | `--exclude NAME` | Skip this subfolder name (repeatable) |
 | `--retry-failures` | Re-process only the files listed in `failures.txt` |
-| `--log PATH` | Log file path (default: `sync_takeout.log`) |
+| `--log PATH` | Log file path (default: `galbum.log`) |
 
 ---
 
@@ -70,7 +82,7 @@ A five-step algorithm pairs each media file with its sidecar JSON:
 
 ## Output files
 
-After a run, two optional summary files are written next to the project root:
+After a run, two optional summary files are written to the current working directory:
 
 - **`orphans.txt`** — media files for which no JSON could be matched
 - **`failures.txt`** — files where JSON was found but processing failed; pass `--retry-failures` on the next run to retry them
