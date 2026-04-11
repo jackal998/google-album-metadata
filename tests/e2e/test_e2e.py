@@ -279,16 +279,28 @@ class TestSkipFiles:
 
 @pytest.mark.e2e
 class TestDryRun:
-    def test_dry_run_does_not_modify_files(self, temp_album):
-        # Read original timestamp before dry run
-        before = _read_tag(temp_album / "IMG_0006.PNG", "XMP:DateTimeOriginal")
-        _run_folder(temp_album, dry_run=True)
-        after = _read_tag(temp_album / "IMG_0006.PNG", "XMP:DateTimeOriginal")
-        assert before == after, \
-            "Dry-run should not write any metadata"
+    def test_dry_run_does_not_modify_files(self, fresh_album):
+        """Dry-run must not change metadata that was written by a prior real run.
 
-    def test_dry_run_returns_no_failures(self, temp_album):
-        _, fail_list = _run_folder(temp_album, dry_run=True)
+        We do a real run first so there is a known, non-empty value to guard —
+        if the 'before' baseline were empty (unprocessed file) the assertion
+        would pass vacuously even if dry-run silently wrote something.
+        """
+        # Real run: write metadata so there is a known value on disk
+        _run_folder(fresh_album, force=True)
+        written = _read_tag(fresh_album / "IMG_0006.PNG", "XMP:DateTimeOriginal")
+        assert written, "Pre-condition: real run must have written a timestamp"
+
+        # Dry-run: must not alter that value
+        _run_folder(fresh_album, dry_run=True)
+        after = _read_tag(fresh_album / "IMG_0006.PNG", "XMP:DateTimeOriginal")
+        assert after == written, (
+            f"Dry-run should not modify already-written metadata. "
+            f"Before: {written!r}  After: {after!r}"
+        )
+
+    def test_dry_run_returns_no_failures(self, fresh_album):
+        _, fail_list = _run_folder(fresh_album, dry_run=True)
         assert fail_list == []
 
 
@@ -330,6 +342,41 @@ class TestAlreadyProcessed:
             "Tampered 2001 timestamp leaked in — file was not skipped as expected"
 
         # Restore JSON for cleanliness
+        data["photoTakenTime"]["timestamp"] = original_ts
+        json_path.write_text(json.dumps(data), encoding="utf-8")
+
+    def test_force_overwrites_stale_metadata(self, fresh_album):
+        """--force must re-process files that already have metadata written.
+
+        This is the mirror of test_second_run_skips_processed_files:
+        after a first run, tamper the JSON, then run again with force=True —
+        the new (tampered) timestamp must appear in the file, proving --force
+        bypassed the batch_read_processed skip gate.
+        """
+        # First run: write the fixture timestamp (2021-01-01)
+        _run_folder(fresh_album, force=False)
+        dt_first = _read_tag(fresh_album / "IMG_0006.PNG", "XMP:DateTimeOriginal")
+        assert "2021:01:01" in dt_first, f"Pre-condition failed: got {dt_first!r}"
+
+        # Tamper JSON to a clearly different year
+        json_path = fresh_album / "IMG_0006.PNG.json"
+        data = json.loads(json_path.read_text(encoding="utf-8"))
+        original_ts = data["photoTakenTime"]["timestamp"]
+        data["photoTakenTime"]["timestamp"] = "978307200"   # 2001-01-01 00:00:00 UTC
+        json_path.write_text(json.dumps(data), encoding="utf-8")
+
+        # Second run with --force: must overwrite despite file already being tagged
+        _run_folder(fresh_album, force=True)
+
+        dt_second = _read_tag(fresh_album / "IMG_0006.PNG", "XMP:DateTimeOriginal")
+        assert "2001:01:01" in dt_second, (
+            f"--force should have re-processed and written the 2001 date, "
+            f"but got: {dt_second!r}"
+        )
+        assert "2021" not in dt_second, \
+            "Old 2021 date still present — --force did not overwrite"
+
+        # Restore JSON
         data["photoTakenTime"]["timestamp"] = original_ts
         json_path.write_text(json.dumps(data), encoding="utf-8")
 
