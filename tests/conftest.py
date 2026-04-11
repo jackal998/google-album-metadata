@@ -67,12 +67,38 @@ def fresh_album(tmp_path):
         if f.is_file() and f.suffix.lower() in _MEDIA_EXTS
     ]
     if media_files:
+        # Strip every tag that galbum writes so that any test using this
+        # fixture can assert the "before" state is empty/absent.
         subprocess.run(
             [
                 "exiftool",
+                # timestamps
                 "-DateTimeOriginal=",
+                "-CreateDate=",
+                "-ModifyDate=",
                 "-XMP:DateTimeOriginal=",
+                "-XMP:CreateDate=",
                 "-QuickTime:CreateDate=",
+                "-QuickTime:ModifyDate=",
+                "-QuickTime:TrackCreateDate=",
+                "-QuickTime:TrackModifyDate=",
+                "-QuickTime:MediaCreateDate=",
+                "-QuickTime:MediaModifyDate=",
+                "-Keys:CreationDate=",
+                # GPS
+                "-GPSLatitude=",
+                "-GPSLongitude=",
+                "-GPSAltitude=",
+                "-GPSLatitudeRef=",
+                "-GPSLongitudeRef=",
+                "-XMP:GPSLatitude=",
+                "-XMP:GPSLongitude=",
+                "-XMP:GPSAltitude=",
+                "-GPSCoordinates=",
+                # description / rating
+                "-XMP:Description=",
+                "-ImageDescription=",
+                "-XMP:Rating=",
                 "-overwrite_original",
                 *media_files,
             ],

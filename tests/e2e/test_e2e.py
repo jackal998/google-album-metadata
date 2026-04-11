@@ -382,6 +382,63 @@ class TestAlreadyProcessed:
 
 
 # ---------------------------------------------------------------------------
+# Write-proof — explicit before → after transformation checks
+#
+# Uses fresh_album (which strips all galbum-written tags), so the "before"
+# state is guaranteed empty.  Proves galbum actually changed the file rather
+# than just finding a pre-existing correct value.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.e2e
+class TestWriteProof:
+    """Each test reads a tag BEFORE the run (asserts absent), runs galbum,
+    then reads AFTER (asserts expected value is now present).
+
+    This is the strongest form of assertion: it proves a transformation
+    happened, not just that the end-state happens to match.
+    """
+
+    def test_png_timestamp_written_from_empty(self, fresh_album):
+        # Before: tag must be absent (fresh_album stripped it)
+        before = _read_tag(fresh_album / "IMG_0006.PNG", "XMP:DateTimeOriginal")
+        assert not before, \
+            f"Pre-condition: XMP:DateTimeOriginal should be absent before run, got {before!r}"
+
+        _run_folder(fresh_album, force=True)
+
+        after = _read_tag(fresh_album / "IMG_0006.PNG", "XMP:DateTimeOriginal")
+        assert FIXTURE_TS_DATE in after, \
+            f"Expected {FIXTURE_TS_DATE!r} written by galbum, got {after!r}"
+
+    def test_jpeg_gps_written_from_empty(self, fresh_album):
+        # Before: GPS must be absent
+        before = _read_tag(fresh_album / "IMG_4474_OZ1We__HD.jpeg", "GPSLatitude")
+        assert not before, \
+            f"Pre-condition: GPSLatitude should be absent before run, got {before!r}"
+
+        _run_folder(fresh_album, force=True)
+
+        after = _read_tag(fresh_album / "IMG_4474_OZ1We__HD.jpeg", "GPSLatitude")
+        assert after, "GPSLatitude should be written"
+        assert float(after) == pytest.approx(FIXTURE_GPS_LAT, abs=0.01), \
+            f"Expected Tokyo lat ~{FIXTURE_GPS_LAT}, got {after!r}"
+
+    def test_video_quicktime_utc_written_from_empty(self, fresh_album):
+        # Before: QuickTime:CreateDate must be absent
+        before = _read_tag(fresh_album / "IMG_9556(1).MP4", "QuickTime:CreateDate")
+        assert not before, \
+            f"Pre-condition: QuickTime:CreateDate should be absent before run, got {before!r}"
+
+        _run_folder(fresh_album, force=True)
+
+        after = _read_tag(fresh_album / "IMG_9556(1).MP4", "QuickTime:CreateDate")
+        assert after == FIXTURE_TS_UTC, (
+            f"QuickTime:CreateDate should be UTC {FIXTURE_TS_UTC!r}, got {after!r}. "
+            "Local time must NOT be stored here."
+        )
+
+
+# ---------------------------------------------------------------------------
 # Source fixture files remain untouched (paranoia check)
 # ---------------------------------------------------------------------------
 
