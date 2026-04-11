@@ -52,7 +52,8 @@ def process_folder(folder: Path, args, et: ExiftoolProcess, log, orphan_list: li
             continue
 
         if not args.force and path in processed_set:
-            log.debug("[SKIP]  %s — already has DateTimeOriginal", path.name)
+            log.debug("[SKIP]  %s — already has DateTimeOriginal (use --force to reprocess)",
+                      path.name)
             skipped += 1
             continue
 
@@ -89,13 +90,20 @@ def process_folder(folder: Path, args, et: ExiftoolProcess, log, orphan_list: li
         }
         label = label_map.get(match.match_type, match.match_type.upper())
 
-        if "error" in output.lower() or "warning" in output.lower():
-            # exiftool still exits 0 for warnings; check for real errors
-            if "0 image files updated" in output and "error" in output.lower():
-                log.error("[FAIL]  %s — exiftool: %s", path.name, output.strip())
-                fail_list.append(str(path))
-                failed += 1
-                continue
+        if output.strip():
+            log.debug("[EXIF]  %s — exiftool output: %s", path.name, output.strip())
+
+        out_lower = output.lower()
+        if "0 image files updated" in output and "error" in out_lower:
+            log.error("[FAIL]  %s — exiftool: %s", path.name, output.strip())
+            fail_list.append(str(path))
+            failed += 1
+            continue
+
+        # Surface any other warnings exiftool emits (e.g. "Can't set FileCreateDate")
+        # even when the EXIF write itself succeeded.
+        if "warning" in out_lower or ("error" in out_lower and "0 image files updated" not in output):
+            log.warning("[WARN]  %s — exiftool: %s", path.name, output.strip())
 
         log.info("[%s]  %s <- %s [%s]%s%s",
                  label, path.name, match.json_path.name, match.match_type, ts_str, gps_str)

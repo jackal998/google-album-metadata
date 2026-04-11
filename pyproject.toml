@@ -9,6 +9,7 @@ description = "Write Google Photos Takeout JSON metadata back into media files"
 requires-python = ">=3.10"
 dependencies = [
     "timezonefinder",
+    "tzdata",   # zoneinfo fallback for Windows (no-op on Linux/macOS)
 ]
 
 [project.scripts]
