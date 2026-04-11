@@ -60,11 +60,24 @@ class TestLocalDatetime:
         assert result[13] == ":" and result[16] == ":"
 
     def test_with_tokyo_gps(self):
-        # Tokyo coords → should give JST (+09:00) if timezonefinder installed
+        # Tokyo coords → JST (+09:00) if timezonefinder+tzdata installed, else UTC.
+        # Either outcome is acceptable; what matters is that the result is a valid
+        # EXIF datetime with an explicit timezone offset and the correct date.
         result = _local_datetime(self.UNIX_2021, lat=35.6762, lon=139.6503)
-        # Either UTC+00:00 (no timezonefinder) or JST +09:00; both are valid
-        assert "2021:01:01" in result or "2021:01:01" in result
-        assert "+" in result or "-" in result  # has a tz offset
+        # Date must be present (2021-01-01 in both UTC and JST for this timestamp)
+        assert "2021:01:01" in result, f"Expected 2021:01:01 in result, got {result!r}"
+        # Must have a timezone offset: "+HH:MM" or "-HH:MM"
+        assert len(result) == 25, \
+            f"Expected 'YYYY:MM:DD HH:MM:SS+HH:MM' (25 chars), got {result!r}"
+        offset = result[19:]   # e.g. "+09:00" or "+00:00"
+        assert offset[0] in ("+", "-"), \
+            f"Timezone offset must start with + or -, got {offset!r}"
+        # If timezonefinder + tzdata resolved the timezone, we expect JST
+        if offset == "+09:00":
+            assert result == "2021:01:01 09:00:00+09:00"
+        else:
+            # Fallback to UTC is also acceptable
+            assert result == "2021:01:01 00:00:00+00:00"
 
 
 # ---------------------------------------------------------------------------

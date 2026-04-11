@@ -1,21 +1,26 @@
 """
-End-to-end tests for sync_takeout.py.
+End-to-end tests for galbum.
 
 These tests:
   1. Copy the fixture album (tests/fixtures/e2e_album/) to a fresh temp dir
-     per test run — original fixture files are NEVER modified.
+     once per test class — original fixture files are NEVER modified.
   2. Run process_folder() against the copy.
   3. Read metadata back with exiftool and assert the expected values.
 
 All fixture JSON sidecars contain controlled, clearly "wrong" metadata
 (timestamp = 2021-01-01 00:00:00 UTC, GPS = Tokyo) so that assertions are
-unambiguous — the script must have written them.
+unambiguous — the script must have written them, not left-over originals.
+
+Fixtures:
+  temp_album  — class-scoped copy; force=True always re-processes (safe to share)
+  fresh_album — function-scoped copy; used by tests that need force=False
 
 Mark: @pytest.mark.e2e
-Requires: exiftool on PATH (installed in CI via apt-get install libimage-exiftool-perl)
+Requires: exiftool on PATH
 """
 
 import argparse
+import json
 import logging
 import subprocess
 from pathlib import Path
@@ -28,9 +33,11 @@ from galbum import ExiftoolProcess, process_folder
 # Shared constants — must match tests/fixtures/e2e_album/*.json
 # ---------------------------------------------------------------------------
 
-FIXTURE_TS_DATE = "2021:01:01"           # from timestamp 1609459200 (UTC)
-FIXTURE_GPS_LAT = 35.6762               # Tokyo latitude
-FIXTURE_GPS_LON = 139.6503              # Tokyo longitude
+FIXTURE_UNIX_TS  = 1609459200            # 2021-01-01 00:00:00 UTC
+FIXTURE_TS_DATE  = "2021:01:01"          # date portion (same in UTC and JST)
+FIXTURE_TS_UTC   = "2021:01:01 00:00:00" # exact UTC datetime (no offset)
+FIXTURE_GPS_LAT  = 35.6762              # Tokyo latitude
+FIXTURE_GPS_LON  = 139.6503             # Tokyo longitude
 FIXTURE_DESCRIPTION = "e2e test fixture"
 
 # ---------------------------------------------------------------------------
@@ -39,7 +46,7 @@ FIXTURE_DESCRIPTION = "e2e test fixture"
 
 def _read_tag(path: Path, tag: str) -> str:
     """Read a single exiftool tag value from a file.
-    -n forces numeric output (e.g. decimal degrees instead of '35 deg 40' 34.32" N').
+    -n forces numeric output (e.g. decimal degrees instead of '35 deg 40.3" N').
     """
     result = subprocess.run(
         ["exiftool", "-n", "-s3", f"-{tag}", str(path)],
@@ -66,7 +73,8 @@ def _run_folder(folder: Path, **arg_overrides):
     return orphan_list, fail_list
 
 # ---------------------------------------------------------------------------
-# Fixture: temp_album is provided by conftest.py
+# Fixtures: temp_album (class-scoped) and fresh_album (function-scoped)
+# are provided by conftest.py
 # ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
@@ -157,11 +165,58 @@ class TestDuplicateNumber:
 
 @pytest.mark.e2e
 class TestLivePhotoVideo:
+    MP4 = "IMG_9556(1).MP4"
+
     def test_mp4_matched_via_heic_json(self, temp_album):
         _run_folder(temp_album)
-        dt = _read_tag(temp_album / "IMG_9556(1).MP4", "XMP:DateTimeOriginal")
+        dt = _read_tag(temp_album / self.MP4, "XMP:DateTimeOriginal")
         assert FIXTURE_TS_DATE in dt, \
             "IMG_9556(1).MP4 should inherit metadata from IMG_9556.HEIC(1).json"
+
+    def test_xmp_create_date_written(self, temp_album):
+        _run_folder(temp_album)
+        dt = _read_tag(temp_album / self.MP4, "XMP:CreateDate")
+        assert FIXTURE_TS_DATE in dt, "XMP:CreateDate should be written for video"
+
+    def test_quicktime_create_date_is_utc(self, temp_album):
+        """QuickTime:CreateDate must be stored as UTC with no timezone offset.
+
+        The fixture GPS resolves to JST (+09:00), so local time is 09:00:00 and
+        UTC is 00:00:00.  The stored value must be the UTC one — if local time
+        leaked in, players and Windows Explorer would double-shift by +09:00.
+        """
+        _run_folder(temp_album)
+        val = _read_tag(temp_album / self.MP4, "QuickTime:CreateDate")
+        assert val == FIXTURE_TS_UTC, (
+            f"QuickTime:CreateDate should be UTC {FIXTURE_TS_UTC!r}, got {val!r}. "
+            "Local time must NOT be stored here."
+        )
+
+    def test_keys_creation_date_has_offset(self, temp_album):
+        """Keys:CreationDate (Apple atom) must carry a timezone offset.
+
+        This tag supports full ISO 8601 with offset, so unlike QuickTime:CreateDate
+        it should include the local timezone — either +09:00 (JST if timezonefinder
+        resolves the GPS) or +00:00 (UTC fallback).  Either way an offset must be
+        present so the stored time is unambiguous.
+        """
+        _run_folder(temp_album)
+        val = _read_tag(temp_album / self.MP4, "Keys:CreationDate")
+        assert FIXTURE_TS_DATE in val, "Keys:CreationDate should contain the date"
+        assert "+" in val or (len(val) > 19 and val[19] == "-"), \
+            f"Keys:CreationDate should have a timezone offset, got {val!r}"
+
+    def test_gps_coordinates_written(self, temp_album):
+        _run_folder(temp_album)
+        # GPSCoordinates is the QuickTime GPS field (signed decimal)
+        coords = _read_tag(temp_album / self.MP4, "GPSCoordinates")
+        assert coords, "GPSCoordinates should be written for video with GPS"
+
+    def test_xmp_gps_written(self, temp_album):
+        _run_folder(temp_album)
+        lat = _read_tag(temp_album / self.MP4, "XMP:GPSLatitude")
+        assert lat, "XMP:GPSLatitude should be written"
+        assert float(lat) == pytest.approx(FIXTURE_GPS_LAT, abs=0.01)
 
 
 # ---------------------------------------------------------------------------
@@ -235,6 +290,48 @@ class TestDryRun:
     def test_dry_run_returns_no_failures(self, temp_album):
         _, fail_list = _run_folder(temp_album, dry_run=True)
         assert fail_list == []
+
+
+# ---------------------------------------------------------------------------
+# Already-processed skip path  (tests batch_read_processed + processed_set)
+# Uses fresh_album (function-scoped) so force=False is meaningful.
+# ---------------------------------------------------------------------------
+
+@pytest.mark.e2e
+class TestAlreadyProcessed:
+    def test_second_run_skips_processed_files(self, fresh_album):
+        """After a first run, a second run WITHOUT --force should skip all files
+        that already have DateTimeOriginal / QuickTime:CreateDate set.
+
+        We verify this by tampering with one JSON file between the two runs:
+        if the second run re-processed the file it would pick up the new
+        timestamp; if it correctly skips, the old written value is preserved.
+        """
+        # First run — processes everything fresh
+        _run_folder(fresh_album, force=False)
+
+        # Tamper: change the timestamp in one JSON to a clearly different value
+        json_path = fresh_album / "IMG_0006.PNG.json"
+        data = json.loads(json_path.read_text(encoding="utf-8"))
+        original_ts = data["photoTakenTime"]["timestamp"]
+        data["photoTakenTime"]["timestamp"] = "978307200"   # 2001-01-01 00:00:00 UTC
+        json_path.write_text(json.dumps(data), encoding="utf-8")
+
+        # Second run — should skip the already-processed file
+        _run_folder(fresh_album, force=False)
+
+        # The PNG should still have the ORIGINAL date (not 2001)
+        dt = _read_tag(fresh_album / "IMG_0006.PNG", "XMP:DateTimeOriginal")
+        assert "2021:01:01" in dt, (
+            f"Expected original 2021 date to be preserved (file should have been "
+            f"skipped on second run), but got: {dt!r}"
+        )
+        assert "2001" not in dt, \
+            "Tampered 2001 timestamp leaked in — file was not skipped as expected"
+
+        # Restore JSON for cleanliness
+        data["photoTakenTime"]["timestamp"] = original_ts
+        json_path.write_text(json.dumps(data), encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------

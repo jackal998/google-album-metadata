@@ -231,6 +231,19 @@ class TestMp4Mov:
         assert any(arg.startswith("-Keys:CreationDate=") for arg in a)
 
     @pytest.mark.parametrize("file_type", ["mp4", "mov"])
+    def test_keys_creation_date_preserves_offset(self, file_type):
+        # Keys:CreationDate (Apple atom) supports full ISO 8601 with timezone offset.
+        # FULL_META has +09:00 — the value written must preserve that offset,
+        # unlike QuickTime fields which must be plain UTC.
+        a = args_str(file_type)
+        keys_vals = [arg.split("=", 1)[1] for arg in a
+                     if arg.startswith("-Keys:CreationDate=")]
+        assert keys_vals, "No Keys:CreationDate arg found"
+        val = keys_vals[0]
+        assert "+09:00" in val, \
+            f"Keys:CreationDate should preserve +09:00 offset from input, got {val!r}"
+
+    @pytest.mark.parametrize("file_type", ["mp4", "mov"])
     def test_xmp_datetime_original(self, file_type):
         a = args_str(file_type)
         assert any(arg.startswith("-XMP:DateTimeOriginal=") for arg in a)
