@@ -319,8 +319,10 @@ class TestAlreadyProcessed:
         if the second run re-processed the file it would pick up the new
         timestamp; if it correctly skips, the old written value is preserved.
         """
-        # First run — processes everything fresh
-        _run_folder(fresh_album, force=False)
+        # First run — force=True to reliably write metadata to every file.
+        # (force=False would skip files whose tags survived the fixture strip,
+        # making the 2021 pre-condition unreliable.)
+        _run_folder(fresh_album, force=True)
 
         # Tamper: change the timestamp in one JSON to a clearly different value
         json_path = fresh_album / "IMG_0006.PNG.json"
@@ -353,8 +355,8 @@ class TestAlreadyProcessed:
         the new (tampered) timestamp must appear in the file, proving --force
         bypassed the batch_read_processed skip gate.
         """
-        # First run: write the fixture timestamp (2021-01-01)
-        _run_folder(fresh_album, force=False)
+        # First run: force=True to reliably write the fixture timestamp to every file.
+        _run_folder(fresh_album, force=True)
         dt_first = _read_tag(fresh_album / "IMG_0006.PNG", "XMP:DateTimeOriginal")
         assert "2021:01:01" in dt_first, f"Pre-condition failed: got {dt_first!r}"
 
@@ -424,10 +426,14 @@ class TestWriteProof:
             f"Expected Tokyo lat ~{FIXTURE_GPS_LAT}, got {after!r}"
 
     def test_video_quicktime_utc_written_from_empty(self, fresh_album):
-        # Before: QuickTime:CreateDate must be absent
+        # Before: QuickTime:CreateDate must be absent or zeroed.
+        # MP4 containers store this field structurally; exiftool cannot truly
+        # remove it — stripping zeroes it to "0000:00:00 00:00:00" instead.
+        # batch_read_processed already treats that as "unprocessed" (valid()
+        # rejects it), so both "" and the null date are acceptable here.
         before = _read_tag(fresh_album / "IMG_9556(1).MP4", "QuickTime:CreateDate")
-        assert not before, \
-            f"Pre-condition: QuickTime:CreateDate should be absent before run, got {before!r}"
+        assert before in ("", "0000:00:00 00:00:00"), \
+            f"Pre-condition: QuickTime:CreateDate should be absent/zeroed before run, got {before!r}"
 
         _run_folder(fresh_album, force=True)
 
