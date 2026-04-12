@@ -137,6 +137,24 @@ def _cmd_sync(args):
                 for f in missing:
                     logging.error("Folder not found: %s", f)
                 sys.exit(1)
+            if not folders:
+                # Check whether root itself is an album (contains media files directly)
+                from .constants import MEDIA_EXTENSIONS
+                has_media = any(f.suffix.lower() in MEDIA_EXTENSIONS
+                                for f in root.iterdir() if f.is_file())
+                if has_media:
+                    logging.info(
+                        "No subfolders found — root appears to be an album itself. "
+                        "Processing root directly."
+                    )
+                    folders = [root]
+                else:
+                    logging.warning(
+                        "No album subfolders found in %s. "
+                        "Pass a parent directory that contains album folders, "
+                        "or use --folder to name specific subfolders.",
+                        root,
+                    )
             for folder in folders:
                 process_folder(folder, args, et, logging.getLogger(), orphan_list, fail_list)
 

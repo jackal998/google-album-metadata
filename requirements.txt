@@ -4,3 +4,7 @@
 # Optional — enables local-timezone timestamps derived from GPS coordinates.
 # Without this, timestamps are written in UTC.
 timezonefinder
+
+# Required on Windows: zoneinfo has no built-in timezone database on Windows;
+# tzdata provides it.  Harmless on Linux/macOS (zoneinfo prefers the OS tz db).
+tzdata

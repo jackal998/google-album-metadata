@@ -1,7 +1,22 @@
 import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .models import ParsedMetadata
+
+
+def _to_utc_str(dt_str: str) -> str:
+    """Convert "YYYY:MM:DD HH:MM:SS+HH:MM" to UTC "YYYY:MM:DD HH:MM:SS" (no offset).
+
+    QuickTime date fields (CreateDate, ModifyDate, etc.) must be stored as UTC with
+    no timezone indicator — that is the QuickTime/MP4 spec.  Feeding local time into
+    those fields causes players and OS date pickers (including Windows Explorer) to
+    double-shift the time by applying the local UTC offset a second time.
+    """
+    # EXIF uses colons in the date part; convert to ISO for fromisoformat()
+    iso = dt_str[:10].replace(":", "-") + "T" + dt_str[11:]
+    dt = datetime.fromisoformat(iso)
+    return dt.astimezone(timezone.utc).strftime("%Y:%m:%d %H:%M:%S")
 
 
 class ExiftoolProcess:
@@ -98,20 +113,20 @@ def build_exiftool_args(
             lat = metadata.gps["latitude"]
             lon = metadata.gps["longitude"]
             alt = metadata.gps.get("altitude", 0.0)
+            # XMP encodes direction in the sign of the decimal — no Ref tags.
             args += [
-                f"-XMP:GPSLatitude={abs(lat)}",
-                f"-XMP:GPSLatitudeRef={'N' if lat >= 0 else 'S'}",
-                f"-XMP:GPSLongitude={abs(lon)}",
-                f"-XMP:GPSLongitudeRef={'E' if lon >= 0 else 'W'}",
-                f"-XMP:GPSAltitude={abs(alt)}",
+                f"-XMP:GPSLatitude={lat}",
+                f"-XMP:GPSLongitude={lon}",
+                f"-XMP:GPSAltitude={alt}",
             ]
         if metadata.description:
             args.append(f"-XMP:Description={metadata.description}")
 
     elif file_type in ("mp4", "mov"):
         if dt:
-            # QuickTime fields don't carry timezone — write UTC time literally
-            dt_qt = dt[:19]   # "YYYY:MM:DD HH:MM:SS"
+            # QuickTime spec: these fields are UTC with no timezone marker.
+            # Convert local time → UTC so players/OS don't double-shift the offset.
+            dt_utc = _to_utc_str(dt)
             for tag in [
                 "QuickTime:CreateDate",
                 "QuickTime:ModifyDate",
@@ -120,20 +135,20 @@ def build_exiftool_args(
                 "QuickTime:MediaCreateDate",
                 "QuickTime:MediaModifyDate",
             ]:
-                args.append(f"-{tag}={dt_qt}")
-            # Apple Keys atom supports timezone offset
+                args.append(f"-{tag}={dt_utc}")
+            # Apple Keys atom and XMP support full timezone offset — use local time.
             args.append(f"-Keys:CreationDate={dt}")
             args.append(f"-XMP:DateTimeOriginal={dt}")
+            args.append(f"-XMP:CreateDate={dt}")
         if metadata.gps:
             lat = metadata.gps["latitude"]
             lon = metadata.gps["longitude"]
             alt = metadata.gps.get("altitude", 0.0)
             # QuickTime GPS: signed decimal degrees
             args.append(f"-GPSCoordinates={lat} {lon} {alt}")
-            args.append(f"-XMP:GPSLatitude={abs(lat)}")
-            args.append(f"-XMP:GPSLatitudeRef={'N' if lat >= 0 else 'S'}")
-            args.append(f"-XMP:GPSLongitude={abs(lon)}")
-            args.append(f"-XMP:GPSLongitudeRef={'E' if lon >= 0 else 'W'}")
+            # XMP encodes direction in the sign of the decimal — no Ref tags.
+            args.append(f"-XMP:GPSLatitude={lat}")
+            args.append(f"-XMP:GPSLongitude={lon}")
         if metadata.description:
             args.append(f"-XMP:Description={metadata.description}")
 

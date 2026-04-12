@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from galbum import ParsedMetadata, build_exiftool_args
+from galbum import ParsedMetadata, build_exiftool_args, _to_utc_str
 
 # ---------------------------------------------------------------------------
 # Shared fixtures
@@ -166,6 +166,35 @@ class TestPngGifWebp:
         assert any(arg.startswith("-XMP:GPSLongitude=") for arg in a)
 
     @pytest.mark.parametrize("file_type", ["png", "gif", "webp"])
+    def test_no_xmp_gps_ref_tags(self, file_type):
+        # XMP has no LatitudeRef/LongitudeRef — direction is encoded in the sign
+        a = args_str(file_type)
+        assert not any("GPSLatitudeRef" in arg for arg in a)
+        assert not any("GPSLongitudeRef" in arg for arg in a)
+
+    @pytest.mark.parametrize("file_type", ["png", "gif", "webp"])
+    def test_xmp_gps_uses_signed_decimal(self, file_type):
+        # North/East: positive values written as-is
+        a = args_str(file_type)
+        lat_arg = next(arg for arg in a if arg.startswith("-XMP:GPSLatitude="))
+        lon_arg = next(arg for arg in a if arg.startswith("-XMP:GPSLongitude="))
+        assert float(lat_arg.split("=")[1]) == pytest.approx(FULL_META.gps["latitude"])
+        assert float(lon_arg.split("=")[1]) == pytest.approx(FULL_META.gps["longitude"])
+
+    @pytest.mark.parametrize("file_type", ["png", "gif", "webp"])
+    def test_xmp_gps_signed_decimal_south_west(self, file_type):
+        meta = ParsedMetadata(
+            dt_str="2021:01:01 00:00:00+00:00",
+            gps={"latitude": -33.868, "longitude": -70.65, "altitude": 0.0},
+            description=None, favorited=False,
+        )
+        a = build_exiftool_args(FAKE_PATH, meta, file_type)
+        lat_arg = next(arg for arg in a if arg.startswith("-XMP:GPSLatitude="))
+        lon_arg = next(arg for arg in a if arg.startswith("-XMP:GPSLongitude="))
+        assert float(lat_arg.split("=")[1]) < 0, "South latitude should be negative"
+        assert float(lon_arg.split("=")[1]) < 0, "West longitude should be negative"
+
+    @pytest.mark.parametrize("file_type", ["png", "gif", "webp"])
     def test_uses_xmp_description(self, file_type):
         a = args_str(file_type)
         assert any(arg.startswith("-XMP:Description=") for arg in a)
@@ -202,9 +231,28 @@ class TestMp4Mov:
         assert any(arg.startswith("-Keys:CreationDate=") for arg in a)
 
     @pytest.mark.parametrize("file_type", ["mp4", "mov"])
+    def test_keys_creation_date_preserves_offset(self, file_type):
+        # Keys:CreationDate (Apple atom) supports full ISO 8601 with timezone offset.
+        # FULL_META has +09:00 — the value written must preserve that offset,
+        # unlike QuickTime fields which must be plain UTC.
+        a = args_str(file_type)
+        keys_vals = [arg.split("=", 1)[1] for arg in a
+                     if arg.startswith("-Keys:CreationDate=")]
+        assert keys_vals, "No Keys:CreationDate arg found"
+        val = keys_vals[0]
+        assert "+09:00" in val, \
+            f"Keys:CreationDate should preserve +09:00 offset from input, got {val!r}"
+
+    @pytest.mark.parametrize("file_type", ["mp4", "mov"])
     def test_xmp_datetime_original(self, file_type):
         a = args_str(file_type)
         assert any(arg.startswith("-XMP:DateTimeOriginal=") for arg in a)
+
+    @pytest.mark.parametrize("file_type", ["mp4", "mov"])
+    def test_xmp_create_date(self, file_type):
+        # XMP:CreateDate added alongside DateTimeOriginal for video editors
+        a = args_str(file_type)
+        assert any(arg.startswith("-XMP:CreateDate=") for arg in a)
 
     @pytest.mark.parametrize("file_type", ["mp4", "mov"])
     def test_gps_coordinates(self, file_type):
@@ -212,12 +260,51 @@ class TestMp4Mov:
         assert any(arg.startswith("-GPSCoordinates=") for arg in a)
 
     @pytest.mark.parametrize("file_type", ["mp4", "mov"])
-    def test_quicktime_date_strips_offset(self, file_type):
-        # QuickTime date fields should not include timezone offset
+    def test_no_xmp_gps_ref_tags(self, file_type):
+        # XMP has no LatitudeRef/LongitudeRef — direction is encoded in the sign
+        a = args_str(file_type)
+        assert not any("XMP:GPSLatitudeRef" in arg for arg in a)
+        assert not any("XMP:GPSLongitudeRef" in arg for arg in a)
+
+    @pytest.mark.parametrize("file_type", ["mp4", "mov"])
+    def test_xmp_gps_uses_signed_decimal(self, file_type):
+        a = args_str(file_type)
+        lat_arg = next(arg for arg in a if arg.startswith("-XMP:GPSLatitude="))
+        lon_arg = next(arg for arg in a if arg.startswith("-XMP:GPSLongitude="))
+        assert float(lat_arg.split("=")[1]) == pytest.approx(FULL_META.gps["latitude"])
+        assert float(lon_arg.split("=")[1]) == pytest.approx(FULL_META.gps["longitude"])
+
+    @pytest.mark.parametrize("file_type", ["mp4", "mov"])
+    def test_quicktime_date_is_utc(self, file_type):
+        # QuickTime date fields must be UTC with no timezone marker.
+        # FULL_META has +09:00, so UTC value should be 00:00:00 (not 09:00:00).
         a = args_str(file_type)
         qt_vals = [arg.split("=", 1)[1] for arg in a
                    if arg.startswith("-QuickTime:CreateDate=")]
         assert qt_vals, "No QuickTime:CreateDate found"
         val = qt_vals[0]
-        assert "+" not in val and "-" not in val[1:], \
+        assert "+" not in val and val[1:].count("-") == 0, \
             f"QuickTime:CreateDate should have no tz offset, got {val!r}"
+        assert "00:00:00" in val, \
+            f"Expected UTC time 00:00:00 (converted from +09:00), got {val!r}"
+
+
+# ---------------------------------------------------------------------------
+# _to_utc_str helper
+# ---------------------------------------------------------------------------
+
+class TestToUtcStr:
+    def test_positive_offset(self):
+        # 09:00 JST → 00:00 UTC
+        assert _to_utc_str("2021:01:01 09:00:00+09:00") == "2021:01:01 00:00:00"
+
+    def test_utc_passthrough(self):
+        assert _to_utc_str("2021:01:01 00:00:00+00:00") == "2021:01:01 00:00:00"
+
+    def test_positive_offset_crosses_midnight(self):
+        # 2021-01-01 01:00:00+08:00 → 2020-12-31 17:00:00 UTC
+        assert _to_utc_str("2021:01:01 01:00:00+08:00") == "2020:12:31 17:00:00"
+
+    def test_half_hour_offset(self):
+        # India Standard Time +05:30
+        assert _to_utc_str("2021:06:15 12:00:00+05:30") == "2021:06:15 06:30:00"

@@ -6,7 +6,7 @@ from .constants import (
     SKIP_FILENAMES,
     TEST_FOLDER_NAME,
 )
-from .exiftool import ExiftoolProcess, batch_read_processed, build_exiftool_args
+from .exiftool import ExiftoolProcess, batch_read_processed, build_exiftool_args, _to_utc_str
 from .file_type import _effective_path, _magic_type, get_file_type
 from .filename_parser import parse_media_filename
 from .json_matching import build_json_index, find_json
