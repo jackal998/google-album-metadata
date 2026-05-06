@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -21,8 +21,62 @@ def is_valid_gps(geo: dict) -> bool:
     )
 
 
-def _local_datetime(unix_ts: int, lat: Optional[float], lon: Optional[float]) -> str:
-    """Return EXIF-formatted datetime in local timezone (from GPS), else UTC."""
+def _parse_exif_offset(offset: str) -> Optional[timezone]:
+    """Parse an EXIF OffsetTimeOriginal string like "+09:00" or "-05:00"."""
+    try:
+        sign = 1 if offset[0] == "+" else -1 if offset[0] == "-" else None
+        if sign is None:
+            return None
+        hh, mm = offset[1:].split(":")
+        return timezone(sign * timedelta(hours=int(hh), minutes=int(mm)))
+    except (ValueError, IndexError):
+        return None
+
+
+def _infer_offset_from_naive(unix_ts: int, naive: str) -> Optional[timezone]:
+    """Infer UTC offset by comparing a naive-local datetime string against unix_ts.
+
+    Used when GPS and OffsetTimeOriginal are both absent but the file has a
+    naive local timestamp from a non-EXIF source (e.g. IPTC DigitalCreationDateTime
+    written by GooglePhotoScan and similar tools that don't record an offset).
+
+    Returns None unless the implied offset is real-world plausible:
+      - within ±14:00 (max real timezone span)
+      - aligned to 15 minutes (every IANA timezone is)
+    These rejection rules guard against junk EXIF, drifted clocks, or naive
+    strings that semantically represent something other than the UTC instant
+    (e.g. an analog photo's original capture date stored as DateCreated).
+    """
+    try:
+        dt_local = datetime.strptime(naive, "%Y:%m:%d %H:%M:%S")
+    except (ValueError, TypeError):
+        return None
+    dt_utc_naive = datetime.fromtimestamp(unix_ts, tz=timezone.utc).replace(tzinfo=None)
+    diff = dt_local - dt_utc_naive
+    total_seconds = int(diff.total_seconds())
+    if abs(total_seconds) > 14 * 3600:
+        return None
+    if total_seconds % (15 * 60) != 0:
+        return None
+    return timezone(timedelta(seconds=total_seconds))
+
+
+def _local_datetime(unix_ts: int, lat: Optional[float], lon: Optional[float],
+                    existing_offset: Optional[str] = None,
+                    existing_local_naive: Optional[str] = None) -> str:
+    """Return EXIF-formatted datetime in local timezone.
+
+    Resolution order:
+      1. GPS coords → TimezoneFinder (most accurate, handles DST)
+      2. existing_offset → fixed offset preserved from the media file's own EXIF
+         OffsetTimeOriginal tag (recovers iPhone's recorded offset when Google
+         strips GPS)
+      3. existing_local_naive → infer offset by diffing IPTC's naive local
+         timestamp against the JSON UTC unix_ts (recovers offset for sources
+         like GooglePhotoScan that write IPTC DigitalCreationDateTime without
+         an explicit offset tag)
+      4. UTC fallback
+    """
     dt_utc = datetime.fromtimestamp(unix_ts, tz=timezone.utc)
     if _TZ_FINDER and lat is not None and lon is not None:
         try:
@@ -57,10 +111,27 @@ def _local_datetime(unix_ts: int, lat: Optional[float], lon: Optional[float]) ->
                 "Timezone lookup error for GPS (%.4f, %.4f): %s — falling back to UTC",
                 lat, lon, exc
             )
+    if existing_offset:
+        tz = _parse_exif_offset(existing_offset)
+        if tz is not None:
+            dt_local = dt_utc.astimezone(tz)
+            offset = dt_local.strftime("%z")            # "+0900"
+            offset_fmt = offset[:3] + ":" + offset[3:]   # "+09:00"
+            return dt_local.strftime("%Y:%m:%d %H:%M:%S") + offset_fmt
+    if existing_local_naive:
+        tz = _infer_offset_from_naive(unix_ts, existing_local_naive)
+        if tz is not None:
+            dt_local = dt_utc.astimezone(tz)
+            offset = dt_local.strftime("%z")
+            offset_fmt = offset[:3] + ":" + offset[3:]
+            return dt_local.strftime("%Y:%m:%d %H:%M:%S") + offset_fmt
     return dt_utc.strftime("%Y:%m:%d %H:%M:%S+00:00")
 
 
-def parse_metadata(json_path: Path) -> Optional[ParsedMetadata]:
+def parse_metadata(json_path: Path,
+                   existing_offset: Optional[str] = None,
+                   existing_local_naive: Optional[str] = None,
+                   ) -> Optional[ParsedMetadata]:
     try:
         data = json.loads(json_path.read_text(encoding="utf-8"))
     except Exception as exc:
@@ -85,7 +156,7 @@ def parse_metadata(json_path: Path) -> Optional[ParsedMetadata]:
             unix = int(ts_block["timestamp"])
             lat = gps["latitude"] if gps else None
             lon = gps["longitude"] if gps else None
-            dt_str = _local_datetime(unix, lat, lon)
+            dt_str = _local_datetime(unix, lat, lon, existing_offset, existing_local_naive)
         except (ValueError, OSError):
             pass
 

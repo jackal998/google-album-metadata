@@ -7,11 +7,12 @@ Unit tests for:
 
 import json
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
 from galbum import is_valid_gps, parse_metadata, _local_datetime
+from galbum.metadata_parser import _infer_offset_from_naive
 
 
 # ---------------------------------------------------------------------------
@@ -59,6 +60,76 @@ class TestLocalDatetime:
         assert result[4] == ":" and result[7] == ":"
         assert result[13] == ":" and result[16] == ":"
 
+    def test_existing_offset_recovers_local_time_when_no_gps(self):
+        # 2024-06-12 11:17:37 UTC + recorded +09:00 → 20:17:37 JST.
+        # Mirrors the Google-Takeout case where geoData is zeroed but the file's
+        # OffsetTimeOriginal still holds the camera-recorded offset.
+        unix = 1718191057
+        result = _local_datetime(unix, None, None, existing_offset="+09:00")
+        assert result == "2024:06:12 20:17:37+09:00"
+
+    def test_existing_offset_negative(self):
+        unix = 1609459200  # 2021-01-01 00:00:00 UTC
+        result = _local_datetime(unix, None, None, existing_offset="-05:00")
+        assert result == "2020:12:31 19:00:00-05:00"
+
+    def test_malformed_existing_offset_falls_back_to_utc(self):
+        result = _local_datetime(self.UNIX_2021, None, None, existing_offset="garbage")
+        assert result == "2021:01:01 00:00:00+00:00"
+
+    # Tier 3: infer offset from naive-local IPTC timestamp ------------------
+
+    def test_naive_local_infers_taipei_offset(self):
+        # The GooglePhotoScan case: JSON UTC 13:33:20, IPTC 21:33:20 (Taipei).
+        # Diff = +8h → infer +08:00 → write 21:33:20+08:00.
+        unix = 1727184800   # 2024-09-24 13:33:20 UTC
+        result = _local_datetime(unix, None, None,
+                                 existing_local_naive="2024:09:24 21:33:20")
+        assert result == "2024:09:24 21:33:20+08:00"
+
+    def test_naive_local_infers_negative_offset(self):
+        unix = 1609459200   # 2021-01-01 00:00:00 UTC
+        # naive 19:00 of previous day → -05:00 (Eastern Standard)
+        result = _local_datetime(unix, None, None,
+                                 existing_local_naive="2020:12:31 19:00:00")
+        assert result == "2020:12:31 19:00:00-05:00"
+
+    def test_naive_local_rejects_diff_beyond_14_hours(self):
+        # 16-hour diff is not a real-world timezone — fall through to UTC.
+        unix = 1609459200   # 2021-01-01 00:00:00 UTC
+        result = _local_datetime(unix, None, None,
+                                 existing_local_naive="2021:01:01 16:00:00")
+        assert result == "2021:01:01 00:00:00+00:00"
+
+    def test_naive_local_rejects_misaligned_diff(self):
+        # 7-minute diff is not aligned to 15-min — reject.
+        unix = 1609459200
+        result = _local_datetime(unix, None, None,
+                                 existing_local_naive="2021:01:01 00:07:00")
+        assert result == "2021:01:01 00:00:00+00:00"
+
+    def test_naive_local_rejects_malformed(self):
+        result = _local_datetime(self.UNIX_2021, None, None,
+                                 existing_local_naive="not a datetime")
+        assert result == "2021:01:01 00:00:00+00:00"
+
+    def test_existing_offset_takes_priority_over_naive_local(self):
+        # Both signals supplied; tier-2 (explicit offset) wins.
+        unix = 1727184800
+        result = _local_datetime(unix, None, None,
+                                 existing_offset="+09:00",
+                                 existing_local_naive="2024:09:24 21:33:20")
+        # +09:00 → 22:33:20 JST (not 21:33:20 Taipei)
+        assert result == "2024:09:24 22:33:20+09:00"
+
+    def test_naive_local_idempotent_at_quarter_hour_offsets(self):
+        # Nepal is +05:45 — the 15-minute alignment must not reject it.
+        # Unix 1609459200 = 2021-01-01 00:00:00 UTC; +05:45 → 05:45:00.
+        unix = 1609459200
+        result = _local_datetime(unix, None, None,
+                                 existing_local_naive="2021:01:01 05:45:00")
+        assert result == "2021:01:01 05:45:00+05:45"
+
     def test_with_tokyo_gps(self):
         # Tokyo coords → JST (+09:00) if timezonefinder+tzdata installed, else UTC.
         # Either outcome is acceptable; what matters is that the result is a valid
@@ -78,6 +149,36 @@ class TestLocalDatetime:
         else:
             # Fallback to UTC is also acceptable
             assert result == "2021:01:01 00:00:00+00:00"
+
+
+# ---------------------------------------------------------------------------
+# _infer_offset_from_naive (direct unit tests)
+# ---------------------------------------------------------------------------
+
+class TestInferOffsetFromNaive:
+    def test_clean_taipei(self):
+        tz = _infer_offset_from_naive(1727184800, "2024:09:24 21:33:20")
+        assert tz is not None
+        assert tz.utcoffset(None) == timedelta(hours=8)
+
+    def test_zero_offset_is_real(self):
+        # London winter — naive equals UTC. We accept this; downstream UTC
+        # fallback would write the same value, so it's a no-op either way.
+        tz = _infer_offset_from_naive(1609459200, "2021:01:01 00:00:00")
+        assert tz is not None
+        assert tz.utcoffset(None) == timedelta(0)
+
+    def test_rejects_too_large(self):
+        assert _infer_offset_from_naive(1609459200, "2021:01:02 12:00:00") is None
+
+    def test_rejects_misaligned(self):
+        # 1-second diff is not a timezone offset
+        assert _infer_offset_from_naive(1609459200, "2021:01:01 00:00:01") is None
+
+    def test_rejects_garbage(self):
+        assert _infer_offset_from_naive(1609459200, "") is None
+        assert _infer_offset_from_naive(1609459200, "garbage") is None
+        assert _infer_offset_from_naive(1609459200, "2021-01-01 00:00:00") is None  # wrong sep
 
 
 # ---------------------------------------------------------------------------

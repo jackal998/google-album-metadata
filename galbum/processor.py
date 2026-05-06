@@ -26,11 +26,13 @@ def process_folder(folder: Path, args, et: ExiftoolProcess, log, orphan_list: li
 
     index = build_json_index(json_files)
 
-    # --retry-failures always force-processes; otherwise respect --force flag
+    # Single batched exiftool read returning three signals. We use the offset and
+    # naive-local maps to recover local time when JSON has no GPS (e.g. Google
+    # Takeout strips it). The processed_set is discarded under --force /
+    # --retry-failures since those modes re-process unconditionally.
+    processed_set, offset_map, naive_local_map = batch_read_processed(media_files, et)
     if files_filter or args.force:
         processed_set = set()
-    else:
-        processed_set = batch_read_processed(media_files, et)
 
     written = skipped = orphaned = failed = 0
 
@@ -44,7 +46,11 @@ def process_folder(folder: Path, args, et: ExiftoolProcess, log, orphan_list: li
             orphaned += 1
             continue
 
-        metadata = parse_metadata(match.json_path)
+        metadata = parse_metadata(
+            match.json_path,
+            existing_offset=offset_map.get(path),
+            existing_local_naive=naive_local_map.get(path),
+        )
         if metadata is None:
             log.warning("[FAIL]  %s — could not parse %s", path.name, match.json_path.name)
             fail_list.append(str(path))
