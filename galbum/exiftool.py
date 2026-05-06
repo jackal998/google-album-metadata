@@ -1,5 +1,6 @@
 import json
 import subprocess
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -21,20 +22,43 @@ def _to_utc_str(dt_str: str) -> str:
 
 
 class ExiftoolProcess:
-    """Persistent exiftool process using -stay_open for batch performance."""
+    """Persistent exiftool process using -stay_open for batch performance.
+
+    stdout and stderr are kept on **separate** OS pipes. Merging them via
+    ``stderr=subprocess.STDOUT`` interleaves chunks at the byte level once the
+    pipe buffer fills (~64 KB on Linux, similar on Windows): for a large
+    output like a 3000-file ``-j`` JSON array, exiftool's progress message
+    can splice itself into the middle of a string value, producing invalid
+    JSON. A daemon thread drains stderr continuously so it never blocks
+    exiftool's writes; ``execute()`` then appends any captured stderr after
+    stdout for backward compatibility with callers that grep for the words
+    "error" or "warning" in the result string.
+    """
 
     def __init__(self):
         self.proc = subprocess.Popen(
             ["exiftool", "-stay_open", "True", "-@", "-"],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
+            stderr=subprocess.PIPE,
             encoding="utf-8",
             errors="replace",
         )
+        self._stderr_buf: list = []
+        self._stderr_lock = threading.Lock()
+        self._stderr_thread = threading.Thread(target=self._drain_stderr, daemon=True)
+        self._stderr_thread.start()
+
+    def _drain_stderr(self) -> None:
+        while True:
+            line = self.proc.stderr.readline()
+            if not line:
+                break
+            with self._stderr_lock:
+                self._stderr_buf.append(line)
 
     def execute(self, args: list) -> str:
-        """Send a list of args, return stdout (stderr merged) up to {ready} sentinel."""
+        """Send args, return stdout (with any stderr appended) up to {ready} sentinel."""
         cmd = "\n".join(str(a) for a in args) + "\n-execute\n"
         self.proc.stdin.write(cmd)
         self.proc.stdin.flush()
@@ -47,7 +71,15 @@ class ExiftoolProcess:
             if stripped == "{ready}":
                 break
             lines.append(stripped)
-        return "\n".join(lines)
+        stdout_text = "\n".join(lines)
+        with self._stderr_lock:
+            err_text = "".join(self._stderr_buf)
+            self._stderr_buf.clear()
+        if err_text:
+            # Append on a new line so JSON parsers slicing on `[ ... ]` are
+            # unaffected, while text-grep callers still see "error"/"warning".
+            return stdout_text + "\n" + err_text.rstrip("\n")
+        return stdout_text
 
     def close(self):
         try:

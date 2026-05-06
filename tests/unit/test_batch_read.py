@@ -212,6 +212,23 @@ class TestBatchReadProcessed:
         processed, offsets, naive = batch_read_processed([a], et)
         assert processed == set() and offsets == {} and naive == {}
 
+    def test_stderr_text_appended_does_not_break_json(self):
+        # Regression: ExiftoolProcess separates stderr from stdout, then
+        # appends stderr text after stdout. The JSON parser slices on the
+        # outermost [ ... ] so trailing stderr (warnings, status messages)
+        # never reaches json.loads. Without stream separation, stderr would
+        # interleave INTO the JSON for large outputs (>~64 KB), splicing
+        # bytes mid-string and producing invalid JSON.
+        a = Path("/tmp/a.jpg")
+        canned = (
+            '[{"SourceFile": "/tmp/a.jpg", "EXIF:DateTimeOriginal": "2024:01:01 00:00:00"}]'
+            "\n    1 image files read"          # stderr appended
+            "\nWarning: something else"          # extra stderr
+        )
+        et = _make_et(canned)
+        processed, _, _ = batch_read_processed([a], et)
+        assert processed == {a}, "trailing stderr must not break JSON parsing"
+
     def test_three_files_each_with_one_distinct_signal(self):
         # Stress: three files, each carrying exactly one of {processed, offset,
         # naive-local}. Verifies the binding stays correct as the record set grows.
