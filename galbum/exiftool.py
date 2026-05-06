@@ -1,3 +1,4 @@
+import json
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -166,42 +167,58 @@ def build_exiftool_args(
     return args
 
 
-_TAGS_PER_FILE = (
+_BATCH_READ_TAGS = (
+    # `-DateTimeOriginal` (no group qualifier) returns BOTH EXIF and XMP variants
+    # under `-G`. PNG/GIF/WebP carry the date in XMP since galbum does not write
+    # EXIF for those formats; JPEG/HEIC/RAW carry it in EXIF. Asking unqualified
+    # gives us both keys in the JSON when both groups have a value.
     "DateTimeOriginal",
     "QuickTime:CreateDate",
     "OffsetTimeOriginal",
     "Composite:DigitalCreationDateTime",
 )
 
+# JSON-output keys under `-j -G` (group-0 prefix).
+# Centralising the key strings prevents a typo from silently dropping a signal.
+_KEYS_PROCESSED = (
+    "EXIF:DateTimeOriginal",
+    "XMP:DateTimeOriginal",
+    "QuickTime:CreateDate",
+)
+_KEY_OFFSET_TIME_ORIGINAL = "EXIF:OffsetTimeOriginal"
+_KEY_DIGITAL_CREATION_DT = "Composite:DigitalCreationDateTime"
 
-def _strip_exiftool_metalines(output: str) -> list:
-    """Drop exiftool's "======== <path>" file-separator headers and the
-    trailing "    N image files read/updated" summary, leaving only tag values.
 
-    With multiple files, exiftool emits a header line before each file's tag
-    block. Without filtering, callers that index by `i * tags_per_file` read
-    the header as data and silently misalign — a long-standing latent bug
-    masked because most callers operated under --force which bypasses the
-    consumer of this output.
+def _parse_exiftool_json(output: str) -> list:
+    """Extract the JSON array from a `-j -G` exiftool invocation.
+
+    `ExiftoolProcess` merges stderr into stdout, so exiftool's status messages
+    (e.g. ``    3 image files read``) appear interleaved with the JSON. Slice
+    by the outermost ``[ ... ]`` rather than parsing the raw output, and fall
+    back to an empty list on any malformation.
     """
-    out = []
-    for line in output.splitlines():
-        if line.startswith("======== "):
-            continue
-        stripped = line.strip()
-        if stripped.endswith("image files read") or stripped.endswith("image files updated"):
-            continue
-        out.append(line)
-    return out
+    start = output.find("[")
+    end = output.rfind("]")
+    if start == -1 or end <= start:
+        return []
+    try:
+        data = json.loads(output[start:end + 1])
+    except json.JSONDecodeError:
+        return []
+    return data if isinstance(data, list) else []
 
 
 def batch_read_processed(media_files: list,
                          et: ExiftoolProcess) -> tuple[set, dict, dict]:
     """Single batched read for processing-time decisions and timezone recovery.
 
+    Uses exiftool's ``-j -G`` JSON output: each record is self-identifying via
+    its ``SourceFile`` field, so positional misalignment is structurally
+    impossible. (An earlier ``-s3 -f`` line-positional parser had a latent
+    multi-file drift bug — JSON eliminates the entire bug class.)
+
     Returns (processed_set, offset_map, naive_local_map). All three signals
-    are extracted from one exiftool invocation; adding tags to the args is
-    cheaper than a second subprocess round-trip.
+    are extracted from one exiftool invocation.
 
       processed_set    — files that already carry DateTimeOriginal/QT:CreateDate
       offset_map       — file → OffsetTimeOriginal (e.g. "+09:00") for tier-2 recovery
@@ -214,32 +231,37 @@ def batch_read_processed(media_files: list,
     if not media_files:
         return set(), {}, {}
 
-    args = [f"-{t}" for t in _TAGS_PER_FILE] + ["-s3", "-f"]
+    args = ["-j", "-G"] + [f"-{t}" for t in _BATCH_READ_TAGS]
     args += [str(p) for p in media_files]
     output = et.execute(args)
+    records = _parse_exiftool_json(output)
 
-    data_lines = _strip_exiftool_metalines(output)
-    n = len(_TAGS_PER_FILE)
+    # Bind records to their input Path by SourceFile. pathlib normalises
+    # forward/back slashes on Windows so dict equality holds regardless of
+    # which separator exiftool emitted.
+    by_path: dict = {}
+    for rec in records:
+        src = rec.get("SourceFile")
+        if isinstance(src, str):
+            by_path[Path(src)] = rec
 
     processed: set = set()
     offsets: dict = {}
     naive_locals: dict = {}
-    valid = lambda v: v and v not in ("-", "0000:00:00 00:00:00")
+    valid = lambda v: isinstance(v, str) and v and v != "0000:00:00 00:00:00"
 
-    for i, path in enumerate(media_files):
-        base = i * n
-        if base + n - 1 >= len(data_lines):
-            break
-        dt_orig = data_lines[base].strip()
-        qt_date = data_lines[base + 1].strip()
-        offset_tag = data_lines[base + 2].strip()
-        naive_local = data_lines[base + 3].strip()
+    for path in media_files:
+        rec = by_path.get(Path(str(path)))
+        if rec is None:
+            continue
 
-        if valid(dt_orig) or valid(qt_date):
+        if any(valid(rec.get(k)) for k in _KEYS_PROCESSED):
             processed.add(path)
-        if valid(offset_tag):
-            offsets[path] = offset_tag
-        if valid(naive_local):
-            naive_locals[path] = naive_local
+        offset = rec.get(_KEY_OFFSET_TIME_ORIGINAL)
+        if valid(offset):
+            offsets[path] = offset
+        naive = rec.get(_KEY_DIGITAL_CREATION_DT)
+        if valid(naive):
+            naive_locals[path] = naive
 
     return processed, offsets, naive_locals
