@@ -32,6 +32,10 @@ failures.txt
 
 # Local data
 /local_data/
+/.local-fixtures/
+
+# Ad-hoc verification harness (paths hardcoded to one machine)
+/verify_takeout.py
 
 # Claude Code worktree session data
 .claude/
