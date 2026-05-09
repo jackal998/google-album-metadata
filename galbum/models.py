@@ -29,6 +29,6 @@ class MatchResult:
 
 @dataclass
 class JsonIndex:
-    by_exact: dict          # "IMG_9556.HEIC.json" -> Path
+    by_exact: dict          # implied_media_filename ("IMG_9556.HEIC") -> Path
     by_title: dict          # json["title"] -> Path
     all_stems: dict         # "IMG_9556" -> [Path, ...]
