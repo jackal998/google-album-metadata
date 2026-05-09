@@ -1,0 +1,26 @@
+{
+  "title": "VERY_LONG_FILENAME_TRUNCATED.HEIC",
+  "description": "e2e new-format test: heavy truncation — title field is authoritative",
+  "imageViews": "1",
+  "creationTime": {
+    "timestamp": "1609459200",
+    "formatted": "2021-01-01"
+  },
+  "photoTakenTime": {
+    "timestamp": "1609459200",
+    "formatted": "2021-01-01"
+  },
+  "geoData": {
+    "latitude": 35.6762,
+    "longitude": 139.6503,
+    "altitude": 10.0,
+    "latitudeSpan": 0.0,
+    "longitudeSpan": 0.0
+  },
+  "favorited": false,
+  "googlePhotosOrigin": {
+    "mobileUpload": {
+      "deviceType": "IOS_PHONE"
+    }
+  }
+}

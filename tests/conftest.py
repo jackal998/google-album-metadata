@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 FIXTURE_ALBUM = Path(__file__).parent / "fixtures" / "e2e_album"
+FIXTURE_ALBUM_NEW_FORMAT = Path(__file__).parent / "fixtures" / "e2e_album_new_format"
 
 
 def _exiftool_available() -> bool:
@@ -40,6 +41,19 @@ def temp_album(tmp_path_factory):
     """
     album_dir = tmp_path_factory.mktemp("e2e_album")
     shutil.copytree(FIXTURE_ALBUM, album_dir / "album")
+    return album_dir / "album"
+
+
+@pytest.fixture(scope="class")
+def temp_album_new_format(tmp_path_factory):
+    """Class-scoped copy of the new-format fixture album.
+
+    Same shape as `temp_album` but for the May-2026+ Takeout sidecar format
+    (`.supplemental-metadata.json` family). Used by tests in
+    test_e2e_new_format.py.
+    """
+    album_dir = tmp_path_factory.mktemp("e2e_album_new_format")
+    shutil.copytree(FIXTURE_ALBUM_NEW_FORMAT, album_dir / "album")
     return album_dir / "album"
 
 
