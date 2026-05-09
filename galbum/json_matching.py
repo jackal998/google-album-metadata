@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -15,14 +16,28 @@ from .models import JsonIndex, MatchResult, MediaFile
 # the suffix from the right ("metadata" → "metadat" → "metada" …) and, in
 # extreme cases, the basename too.
 #
-# Older exports (pre-May-2026) used a plain ``.json`` suffix. We continue to
-# support that for users with mixed exports.
+# When the same media file has duplicate uploads in Google Photos, the (N)
+# disambiguator is placed *between* the suffix and ``.json``:
+#     IMG_X.HEIC.supplemental-metadata(1).json
+# (compared with the legacy form ``IMG_X.HEIC(1).json``). Our matcher's
+# Step 2 candidate construction expects the (N) on the implied media name
+# (``IMG_X.HEIC(1)``), so we strip the suffix and reattach (N) on the way
+# out — this lets a single by_exact key serve both formats.
 #
-# Order matters: longest suffix first, so a filename ending in
-# ``.supplemental-metadata.json`` is matched as the full form rather than as
-# the bare ``.json`` fallback (which would leave ``...supplemental-metadata``
-# in the implied media name).
+# Older exports (pre-May-2026) used a plain ``.json`` suffix. We continue
+# to support that for users with mixed exports.
 
+# Matches a new-format suffix: ``.supplemental-meta`` (with optional 1-4
+# additional chars: ``meta``, ``metad``, ``metada``, ``metadat``,
+# ``metadata``), an optional ``(N)`` disambiguator, and ``.json``. Anchored
+# to the end of the string so we only match the trailing portion.
+_SUPPL_FAMILY_RE = re.compile(
+    r"\.supplemental-meta(?:data|dat|da|d)?(\(\d+\))?\.json$"
+)
+
+# Public list of suffix variants — kept for callers that want to know what
+# we recognise. Listed longest-first; the dupe-disambiguator forms are
+# implicit via _SUPPL_FAMILY_RE, not here.
 SUPPL_SUFFIXES = (
     ".supplemental-metadata.json",
     ".supplemental-metadat.json",
@@ -36,25 +51,43 @@ SUPPL_SUFFIXES = (
 def _strip_json_suffix(name: str) -> Optional[str]:
     """Return the implied media filename a sidecar `name` describes, or None.
 
-    Tries every known suffix in priority order (longest first). Returns the
-    portion of the filename that *should* match the underlying media file.
+    The implied name is what Step 1 / Step 2 / Step 3 / Step 4 candidate
+    construction in ``find_json`` looks up. Notably, when the sidecar
+    carries a ``(N)`` disambiguator we re-attach that ``(N)`` to the head
+    so the result matches the ``IMG_X.HEIC(1)`` shape Step 2 produces for
+    the corresponding ``IMG_X(1).HEIC`` media file.
 
-    Examples (modern format):
+    Examples — new format, no dupe:
         "IMG_0022.HEIC.supplemental-metadata.json" → "IMG_0022.HEIC"
         "IMG_X.HEIC.supplemental-metadat.json"     → "IMG_X.HEIC"
 
-    Examples (legacy format):
-        "IMG_9556.HEIC.json"   → "IMG_9556.HEIC"
-        "IMG_9556.HEIC(1).json" → "IMG_9556.HEIC(1)"
+    Examples — new format, with dupe (the regression PR #7 missed):
+        "IMG_X.HEIC.supplemental-metadata(1).json" → "IMG_X.HEIC(1)"
+        "IMG_X.HEIC.supplemental-metad(1).json"    → "IMG_X.HEIC(1)"
 
-    Heavily-truncated case (basename also trimmed by Google to fit MAX_PATH):
+    Examples — legacy format:
+        "IMG_9556.HEIC.json"     → "IMG_9556.HEIC"
+        "IMG_9556.HEIC(1).json"  → "IMG_9556.HEIC(1)"
+
+    Heavily-truncated case (basename also trimmed by Google to fit
+    MAX_PATH):
         "00100lrPORTRAIT_..._C(1).json" → "00100lrPORTRAIT_..._C(1)"
     The implied name in that case carries no extension and won't match a
     real media file by name — title-field matching (Step 5) handles it.
     """
-    for s in SUPPL_SUFFIXES:
-        if name.endswith(s):
-            return name[: -len(s)]
+    # New-format family first: matches both no-dupe and (N)-dupe forms in
+    # one pass, including all five suffix-truncation variants.
+    m = _SUPPL_FAMILY_RE.search(name)
+    if m:
+        head = name[: m.start()]
+        dupe = m.group(1) or ""
+        return head + dupe
+
+    # Legacy ``.json`` form. The (N), when present, is already part of the
+    # head (e.g. ``IMG_9556.HEIC(1)``), so plain truncation suffices.
+    if name.endswith(".json"):
+        return name[: -len(".json")]
+
     return None
 
 

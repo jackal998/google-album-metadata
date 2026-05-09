@@ -334,3 +334,96 @@ class TestNewFormatHeavilyTruncated:
         result = find_json(mf("metadata-report.pdf"), index)
         assert result is not None
         assert result.match_type == "exact"
+
+
+# ---------------------------------------------------------------------------
+# New format with duplicate disambiguator — (N) is placed *between* the
+# supplemental-metadata suffix and `.json`, e.g. ``.supplemental-metadata(1).json``.
+# This is distinct from the legacy form (``.HEIC(1).json``) and from the
+# no-dupe new form (``.supplemental-metadata.json``).
+#
+# Regression for the May-2026 export's 66 false orphans.
+# ---------------------------------------------------------------------------
+
+class TestNewFormatDupeDisambiguator:
+
+    @pytest.mark.parametrize("suppl", [
+        ".supplemental-metadata",
+        ".supplemental-metadat",
+        ".supplemental-metada",
+        ".supplemental-metad",
+        ".supplemental-meta",
+    ])
+    def test_dupe_one_with_each_truncation_variant(self, suppl):
+        # IMG_X(1).HEIC + IMG_X.HEIC.<suppl>(1).json should resolve via Step 2.
+        index = _make_index(f"IMG_X.HEIC{suppl}(1).json")
+        result = find_json(mf("IMG_X(1).HEIC"), index)
+        assert result is not None, (
+            f"failed to match IMG_X(1).HEIC against IMG_X.HEIC{suppl}(1).json"
+        )
+        assert result.match_type == "duplicate"
+
+    @pytest.mark.parametrize("n", [1, 2, 5, 10, 99])
+    def test_dupe_n_values(self, n):
+        # Higher (N) values must work the same way as (1).
+        index = _make_index(f"IMG_X.HEIC.supplemental-metadata({n}).json")
+        result = find_json(mf(f"IMG_X({n}).HEIC"), index)
+        assert result is not None
+        assert result.match_type == "duplicate"
+
+    def test_real_world_img_1856_pattern(self):
+        # The exact pattern observed in the failing 0508 dry-run on
+        # 2022 年的相片. Both the no-dupe and the dupe sidecars are present;
+        # the (1).HEIC must resolve to the (1)-suffixed sidecar, not the
+        # plain one.
+        index = _make_index(
+            "IMG_1856.HEIC.supplemental-metadata.json",
+            "IMG_1856.HEIC.supplemental-metadata(1).json",
+        )
+        plain_result = find_json(mf("IMG_1856.HEIC"), index)
+        dupe_result = find_json(mf("IMG_1856(1).HEIC"), index)
+
+        assert plain_result is not None and plain_result.match_type == "exact"
+        assert plain_result.json_path == Path(
+            "/fake/IMG_1856.HEIC.supplemental-metadata.json"
+        )
+
+        assert dupe_result is not None and dupe_result.match_type == "duplicate"
+        assert dupe_result.json_path == Path(
+            "/fake/IMG_1856.HEIC.supplemental-metadata(1).json"
+        )
+
+    def test_video_orphan_finds_dupe_companion_with_new_suffix(self):
+        # IMG_X(1).MP4 (no own sidecar) → companion at
+        # IMG_X.HEIC.supplemental-metadata(1).json via Step 3.
+        # This is the "live photo dupe" case in new format.
+        index = _make_index("IMG_X.HEIC.supplemental-metadata(1).json")
+        result = find_json(mf("IMG_X(1).MP4"), index)
+        assert result is not None
+        assert result.match_type == "live_photo"
+
+    def test_edited_dupe_with_new_suffix(self):
+        # IMG_X-已編輯(1).HEIC should fall back to IMG_X.HEIC.supplemental-metadata(1).json
+        index = _make_index("IMG_X.HEIC.supplemental-metadata(1).json")
+        result = find_json(mf("IMG_X-已編輯(1).HEIC"), index)
+        assert result is not None
+        assert result.match_type == "edited_fallback"
+
+    def test_dupe_truncated_n_above_9(self):
+        # Ensure multi-digit (N) works with truncated suffix too.
+        index = _make_index("IMG_X.HEIC.supplemental-metad(42).json")
+        result = find_json(mf("IMG_X(42).HEIC"), index)
+        assert result is not None
+        assert result.match_type == "duplicate"
+
+    def test_dupe_does_not_crosstalk_with_no_dupe_index(self):
+        # If only the no-dupe sidecar exists, IMG_X(1).HEIC must NOT
+        # incorrectly resolve to it (would silently apply wrong metadata).
+        index = _make_index("IMG_X.HEIC.supplemental-metadata.json")
+        result = find_json(mf("IMG_X(1).HEIC"), index)
+        # May resolve via title-match (Step 5) if the title field were
+        # populated — but our mock doesn't set titles, so result is None.
+        # The important property: if it does resolve, it must NOT be
+        # match_type "duplicate" (which would wrongly imply a real (1) sidecar).
+        if result is not None:
+            assert result.match_type != "duplicate"
