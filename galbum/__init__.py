@@ -9,7 +9,7 @@ from .constants import (
 from .exiftool import ExiftoolProcess, batch_read_processed, build_exiftool_args, _to_utc_str
 from .file_type import _effective_path, _magic_type, get_file_type
 from .filename_parser import parse_media_filename
-from .json_matching import build_json_index, find_json
+from .json_matching import SUPPL_SUFFIXES, _strip_json_suffix, build_json_index, find_json
 from .metadata_parser import _local_datetime, is_valid_gps, parse_metadata
 from .models import JsonIndex, MatchResult, MediaFile, ParsedMetadata
 from .processor import process_folder
