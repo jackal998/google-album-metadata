@@ -143,6 +143,38 @@ class TestDuplicateReorderNewFormat:
 
 
 # ---------------------------------------------------------------------------
+# Real-world Google (N) placement — (N) lives INSIDE the suffix, between
+# `metadata` and `.json`:
+#     IMG_X.HEIC.supplemental-metadata(1).json
+# Distinct from the IMG_DUPE fixture above which uses .HEIC(1).supplemental-...
+# Both placements work post-PR-D, but real-world Google output is this one
+# (verified against the May-2026 Takeout export — see PR-D for the regression
+# this fixture pins down).
+# ---------------------------------------------------------------------------
+
+@pytest.mark.e2e
+class TestRealGoogleDupePlacement:
+    def test_original_resolves_via_exact(self, temp_album_new_format):
+        # IMG_INLINE_DUPE.HEIC + .HEIC.supplemental-metadata.json (Step 1: exact)
+        _run_folder(temp_album_new_format)
+        dt = _read_tag(temp_album_new_format / "IMG_INLINE_DUPE.HEIC",
+                       "DateTimeOriginal")
+        assert FIXTURE_TS_DATE in dt
+
+    def test_duplicate_resolves_via_step2_with_inline_n(self, temp_album_new_format):
+        # IMG_INLINE_DUPE(1).HEIC + .HEIC.supplemental-metadata(1).json (Step 2)
+        # Pre-PR-D this would be orphaned: _strip_json_suffix only stripped
+        # `.json` for this filename pattern, leaving `…supplemental-metadata(1)`
+        # as the implied-name key — never matching anything Step 2 looks up.
+        _run_folder(temp_album_new_format)
+        dt = _read_tag(temp_album_new_format / "IMG_INLINE_DUPE(1).HEIC",
+                       "DateTimeOriginal")
+        assert FIXTURE_TS_DATE in dt, (
+            f"IMG_INLINE_DUPE(1).HEIC should resolve to its dupe sidecar; got {dt!r}"
+        )
+
+
+# ---------------------------------------------------------------------------
 # Heavy truncation: JSON filename too short to derive media name from
 # (title field is authoritative — Step 5 title_match)
 # ---------------------------------------------------------------------------
