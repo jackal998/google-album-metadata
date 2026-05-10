@@ -104,6 +104,57 @@ class TestJpegHeicRaw:
         assert any(arg.startswith("-ModifyDate=") for arg in a)
 
     @pytest.mark.parametrize("file_type", ["jpeg", "heic", "raw"])
+    def test_oto_written_for_tier1_or_tier2_offset(self, file_type):
+        # Tier-1 (GPS lookup) or tier-2 (file's own OffsetTimeOriginal) produce
+        # a real local-time offset. OTO must be written so it can never drift
+        # from DTO's embedded suffix.
+        meta = ParsedMetadata(
+            dt_str="2024:06:12 20:17:37+09:00",
+            gps=None, description=None, favorited=False,
+        )
+        a = build_exiftool_args(FAKE_PATH, meta, file_type)
+        assert "-OffsetTimeOriginal=+09:00" in a
+
+    @pytest.mark.parametrize("file_type", ["jpeg", "heic", "raw"])
+    def test_oto_written_for_tier4_utc_fallback(self, file_type):
+        # Regression for the production-data finding: ~7.6% of photos had
+        # tier-4 UTC writes that left a stale non-UTC OTO behind from a
+        # prior writer (camera, GooglePhotoScan). Tier-4 must now write
+        # OTO=+00:00 so any stale offset is overwritten.
+        meta = ParsedMetadata(
+            dt_str="2024:06:12 20:17:37+00:00",
+            gps=None, description=None, favorited=False,
+        )
+        a = build_exiftool_args(FAKE_PATH, meta, file_type)
+        assert "-OffsetTimeOriginal=+00:00" in a
+
+    @pytest.mark.parametrize("file_type", ["jpeg", "heic", "raw"])
+    def test_oto_written_for_negative_offset(self, file_type):
+        # Western-hemisphere offsets (e.g. PST/EST) produce negative offsets.
+        meta = ParsedMetadata(
+            dt_str="2024:06:12 14:17:37-05:00",
+            gps=None, description=None, favorited=False,
+        )
+        a = build_exiftool_args(FAKE_PATH, meta, file_type)
+        assert "-OffsetTimeOriginal=-05:00" in a
+
+    @pytest.mark.parametrize("file_type", ["jpeg", "heic", "raw"])
+    def test_oto_written_for_quarter_hour_offset(self, file_type):
+        # Real-world quarter-hour zones: Nepal +05:45, Newfoundland -03:30,
+        # Chatham +12:45. galbum's tier-3 IPTC inference accepts these.
+        meta = ParsedMetadata(
+            dt_str="2024:06:12 18:02:37+05:45",
+            gps=None, description=None, favorited=False,
+        )
+        a = build_exiftool_args(FAKE_PATH, meta, file_type)
+        assert "-OffsetTimeOriginal=+05:45" in a
+
+    def test_oto_not_written_when_no_dt(self):
+        meta = ParsedMetadata(dt_str=None, gps=None, description=None, favorited=False)
+        a = build_exiftool_args(FAKE_PATH, meta, "jpeg")
+        assert not any(arg.startswith("-OffsetTimeOriginal") for arg in a)
+
+    @pytest.mark.parametrize("file_type", ["jpeg", "heic", "raw"])
     def test_exif_gps_tags(self, file_type):
         a = args_str(file_type)
         assert any(arg.startswith("-GPSLatitude=") for arg in a)
@@ -199,6 +250,14 @@ class TestPngGifWebp:
         a = args_str(file_type)
         assert any(arg.startswith("-XMP:Description=") for arg in a)
 
+    @pytest.mark.parametrize("file_type", ["png", "gif", "webp"])
+    def test_no_oto_for_xmp_only_formats(self, file_type):
+        # OffsetTimeOriginal is an EXIF tag. PNG/GIF/WebP go through the
+        # XMP-only write path; XMP encodes the offset directly in the
+        # date string, so no separate offset tag applies.
+        a = args_str(file_type)
+        assert not any(arg.startswith("-OffsetTimeOriginal") for arg in a)
+
 
 # ---------------------------------------------------------------------------
 # MP4 / MOV  (QuickTime tags)
@@ -247,6 +306,14 @@ class TestMp4Mov:
     def test_xmp_datetime_original(self, file_type):
         a = args_str(file_type)
         assert any(arg.startswith("-XMP:DateTimeOriginal=") for arg in a)
+
+    @pytest.mark.parametrize("file_type", ["mp4", "mov"])
+    def test_no_oto_for_video(self, file_type):
+        # OffsetTimeOriginal is an EXIF still-image tag. Videos use
+        # Keys:CreationDate (with offset) and QuickTime UTC fields. No OTO
+        # concept in the QuickTime/MP4 spec.
+        a = args_str(file_type)
+        assert not any(arg.startswith("-OffsetTimeOriginal") for arg in a)
 
     @pytest.mark.parametrize("file_type", ["mp4", "mov"])
     def test_xmp_create_date(self, file_type):
