@@ -194,10 +194,11 @@ The 5-step algorithm becomes simpler — most steps collapse into "look up by ti
 
 Two field changes:
 
-1. `archived` field — new. Decide:
-   - **Option A** (minimal): ignore it, only handle `favorited` as today
-   - **Option B**: write a distinguishing tag (e.g. `XMP:Label="Archived"`) so archived photos can be filtered in viewers
-   - **Recommended**: Option A for now (no spec yet for what an "archived" photo should look like in EXIF), revisit when user has a use case
+1. `archived` field — new. **Decision: ignore it (Option A).**
+   - **Why:** No agreed-on EXIF/XMP convention for "archived" — every viewer interprets `XMP:Label`, custom XMP namespaces, or `Rating` differently. Writing a tag galbum invented would create misleading metadata in every other tool.
+   - **Prevalence:** confirmed 22.4% of JSONs in the May-2026 production library carry `archived: true` (2,498 of 11,143). Not rare — but not actionable without a downstream use case.
+   - **What this means:** archived photos receive the same EXIF treatment as non-archived ones. The `archived: true` flag survives only in the original JSON sidecar; nothing in the resulting media file distinguishes archived from non-archived.
+   - **When to revisit:** if the user has a concrete downstream goal (e.g. "I want Lightroom to filter archived photos out" → pick the tag Lightroom reads; "I want Photo Mechanic" → different tag). Don't speculate-write until the consumer is named.
 
 2. `geoDataExif` rare — existing fallback logic still works (if absent, fall through to `geoData`). No code change needed.
 
@@ -251,15 +252,15 @@ Each PR independently shippable, no broken intermediate states:
    - Mirror existing e2e tests to run against the new fixtures
    - Verify processor + metadata_parser handle the new format end-to-end
 
-3. **PR-C: `archived` field handling (deferred)**
-   - Skip until user has a concrete request for what to do with archived photos
+3. **PR-C: `archived` field handling — RESOLVED as won't-implement.**
+   - Decided 2026-05-10: galbum will continue to ignore the `archived` field. See "Two field changes" §1 above for the rationale and revisit conditions.
 
 4. **Standalone tool: `tools/place_loose_movs.py`** — already drafted, reviewable separately.
 
 ## Open questions (need user input)
 
-- **Archived photos**: should they be flagged in EXIF / XMP somehow, or
-  ignored? (Current proposal: ignore.)
+- ~~**Archived photos**: should they be flagged in EXIF / XMP somehow, or
+  ignored?~~ **Resolved 2026-05-10: ignore.** See §1 of "Two field changes" above.
 - **Backward compat**: keep supporting old `.json` sidecar format in the
   same code path? (Current proposal: yes — minimal cost, helps anyone
   with mixed exports.)
