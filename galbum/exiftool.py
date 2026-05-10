@@ -118,6 +118,16 @@ def build_exiftool_args(
                 f"-CreateDate={dt}",
                 f"-ModifyDate={dt}",
             ]
+            # Write OffsetTimeOriginal alongside DTO so the two tags can never
+            # drift. When a file already had a non-UTC OTO from a prior writer
+            # (camera, GooglePhotoScan, etc.) and galbum falls back to tier-4
+            # UTC, leaving OTO unmodified caused a TZ-shift hazard for any
+            # reader that prioritises OTO over DTO's embedded offset suffix —
+            # ~7.6% of photos in the May-2026 production library exhibited
+            # this. galbum's dt_str is always `YYYY:MM:DD HH:MM:SS+HH:MM`
+            # (25 chars), so the offset can be sliced directly.
+            if len(dt) >= 25 and dt[19] in ("+", "-"):
+                args.append(f"-OffsetTimeOriginal={dt[19:25]}")
         if metadata.gps:
             lat = metadata.gps["latitude"]
             lon = metadata.gps["longitude"]
