@@ -15,8 +15,8 @@ For zip indices we DON'T have:
   - Report any genuinely missing indices (no zip, no loose media)
 
 Usage:
-  python audit_takeout_extraction.py                 # uses defaults
-  python audit_takeout_extraction.py --zip-dir <dir> --extract-root <dir> \\
+  python tools/audit_takeout_extraction.py                 # uses defaults
+  python tools/audit_takeout_extraction.py --zip-dir <dir> --extract-root <dir> \\
                                      --zip-pattern <glob>
 
 Defaults match the May 2026 Takeout export at

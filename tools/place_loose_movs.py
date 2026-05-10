@@ -18,7 +18,7 @@ loose files exceeds the count of JSON sidecars for that basename, the extras
 are reported and left at the zip-dir root for manual triage.
 
 Usage:
-  python place_loose_movs.py [--dry-run] [--link]
+  python tools/place_loose_movs.py [--dry-run] [--link]
 
 Defaults match the May 2026 Takeout layout.
 """

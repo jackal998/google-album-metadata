@@ -88,7 +88,7 @@ folder to drop the trailing period (`E.J`) fixed accessibility.
      tools — rename via `mv` to fix" message
 2. The audit script should normalise zip-internal paths the same way
    when checking on-disk presence (already implemented in
-   `audit_takeout_extraction.py`).
+   `tools/audit_takeout_extraction.py`).
 
 ### 4. Large-video split-out at archive root — same as before, with a Windows landmine
 
@@ -130,7 +130,7 @@ This is a genuine data-integrity hazard. Mitigations:
 3. **Manual handling** — document the collision in galbum output and
    leave it to the user to decide which version to keep.
 
-`place_loose_movs.py` currently uses `Path.hardlink_to` which raises
+`tools/place_loose_movs.py` currently uses `Path.hardlink_to` which raises
 `WinError 183` on collision (Python's pathlib treats Windows
 case-insensitivity correctly here). The script catches this and logs
 the failure, but a smarter version would proactively detect existing
@@ -228,11 +228,11 @@ with a few canonical files using the new suffix variants:
 Existing fixtures stay — backward-compat support for old format remains
 valuable (some users have older exports).
 
-### Loose-MOV placement (`place_loose_movs.py` — already drafted)
+### Loose-MOV placement (`tools/place_loose_movs.py` — already drafted)
 
 Standalone tool, not part of galbum core. Run once after extraction to
 copy split-out videos next to their album-folder sidecars. Implementation
-already drafted in `place_loose_movs.py` at repo root.
+lives in `tools/place_loose_movs.py`.
 
 ## Suggested PR sequence
 
@@ -254,7 +254,7 @@ Each PR independently shippable, no broken intermediate states:
 3. **PR-C: `archived` field handling (deferred)**
    - Skip until user has a concrete request for what to do with archived photos
 
-4. **Standalone tool: `place_loose_movs.py`** — already drafted, reviewable separately.
+4. **Standalone tool: `tools/place_loose_movs.py`** — already drafted, reviewable separately.
 
 ## Open questions (need user input)
 
