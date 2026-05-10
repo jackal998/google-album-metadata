@@ -41,3 +41,52 @@ sidecar count are reported and left at the archive root for manual triage.
 python tools/place_loose_movs.py --dry-run
 python tools/place_loose_movs.py --link
 ```
+
+## `verify_production_tags.py`
+
+Run after `galbum sync` to verify the metadata that was actually written
+matches the JSON sidecar source-of-truth. Walks the extracted Takeout tree,
+classifies each media file by edge-case bucket (match-type / sidecar format /
+tier evidence), draws a stratified sample, batch-reads tags via persistent
+exiftool, compares against the JSON, and emits a markdown report covering
+DATE / GPS / DESC / FAV correctness plus an OTO consistency section.
+
+```
+python tools/verify_production_tags.py                               # 15% sample
+python tools/verify_production_tags.py --sample-pct 1.0              # full scan
+python tools/verify_production_tags.py --limit 30                    # smoke test
+```
+
+The script is read-only — it never writes EXIF, never moves files. Safe to
+run repeatedly. Defaults match the May-2026 Takeout layout; override
+with `--root <path>`.
+
+### Targeted backfill workflow
+
+When verification surfaces a class of inconsistency (e.g. STALE OTO from
+a pre-PR-#12 write), pair this script with `galbum sync --retry-failures`
+for surgical cleanup:
+
+```bash
+# 1. Identify impacted files (full scan, paths-only output)
+python tools/verify_production_tags.py \
+  --list-stale-paths /tmp/stale-paths.txt \
+  --list-missing-paths /tmp/missing-paths.txt \
+  --output /tmp/full-scan-report.md
+
+# 2. Targeted re-write via galbum's existing retry plumbing
+mkdir backfill && cd backfill
+cp /tmp/stale-paths.txt failures.txt
+python -m galbum sync --retry-failures --force "<root>"
+
+# 3. Re-verify only the impacted files
+python tools/verify_production_tags.py \
+  --paths-from /tmp/stale-paths.txt \
+  --output /tmp/post-fix-report.md
+```
+
+`--list-stale-paths` and `--list-missing-paths` force a 100% scan and emit
+absolute paths in the format `galbum sync --retry-failures` consumes
+(`failures.txt` lines). `--paths-from FILE` restricts verification to a
+specific path list; useful for confirming a targeted fix landed without
+re-walking the whole library.
