@@ -1,5 +1,26 @@
 # Google Album Metadata Tool Specification
 
+> **HISTORICAL DOCUMENT — kept for archaeology, not maintained.**
+>
+> This file dates from the original Ruby-era prototype (`galbumtool` gem,
+> CSV output, hardcoded UTC+08:00 default). The tool has since been
+> rewritten in Python as the `galbum` package, the Ruby implementation
+> removed, and the runtime behaviour has diverged substantially —
+> particularly around timezone recovery (now a 4-tier resolver), sidecar
+> format support (May-2026+ `.supplemental-metadata.json` family + 5
+> truncation variants + inside-suffix `(N)` disambiguator), output
+> reporting (no CSV — uses `orphans.txt` / `failures.txt`), and matching
+> algorithm.
+>
+> **For current usage, see [README.md](README.md).**
+> **For the live design notes behind the May-2026 format work, see
+> [docs/new-takeout-format-plan.md](docs/new-takeout-format-plan.md).**
+>
+> The content below is preserved verbatim as a record of the original
+> design intent.
+
+---
+
 ## 1. Overview
 The Google Album Metadata Tool (GAlbumTool) is designed to process media files from Google Photos Takeout, extract metadata from associated JSON files, and apply this metadata to the media files using ExifTool.
 
